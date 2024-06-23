@@ -1,0 +1,19 @@
+[
+  {
+    "create": "admins"
+  },
+  {
+    "collMod": "admins",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["user_id"],
+        "properties": {
+          "user_id": {
+            "bsonType": "long"
+          }
+        }
+      }
+    }
+  }
+]

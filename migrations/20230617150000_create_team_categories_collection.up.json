@@ -1,0 +1,25 @@
+[
+  {
+    "create": "team_categories"
+  },
+  {
+    "collMod": "team_categories",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["name", "teams"],
+        "properties": {
+          "name": {
+            "bsonType": "string"
+          },
+          "teams": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+]

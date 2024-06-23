@@ -1,0 +1,19 @@
+[
+  {
+    "create": "participants"
+  },
+  {
+    "collMod": "participants",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "bsonType": "string"
+          }
+        }
+      }
+    }
+  }
+]

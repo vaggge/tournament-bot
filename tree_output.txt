@@ -1,0 +1,32 @@
+.
+├── Dockerfile
+├── cmd
+│   └── main.go
+├── docker-compose.yml
+├── go.mod
+├── go.sum
+├── internal
+│   ├── bot
+│   │   ├── bot.go
+│   │   └── handlers.go
+│   ├── db
+│   │   ├── db.go
+│   │   └── models.go
+│   ├── notifications
+│   │   └── notifications.go
+│   ├── services
+│   │   └── tournament.go
+│   └── web
+│       └── server.go
+├── migrations
+│   ├──   20230617130000_create_participants_collection.down.json
+│   ├──   20230617130000_create_participants_collection.up.json
+│   ├── 20230617140000_create_tournaments_collection.down.json
+│   ├── 20230617140000_create_tournaments_collection.up.json
+│   ├── 20230617150000_create_team_categories_collection.down.json
+│   ├── 20230617150000_create_team_categories_collection.up.json
+│   ├── 20230617160000_create_admins_collection.down.json
+│   └── 20230617160000_create_admins_collection.up.json
+└── tree_output.txt
+
+9 directories, 21 files
