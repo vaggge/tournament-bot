@@ -18,9 +18,8 @@
           "matches",
           "standings",
           "is_active",
-          "created_at",
           "setup_completed",
-          "playoff",
+          "created_at",
           "is_completed"
         ],
         "properties": {
@@ -52,7 +51,16 @@
             "bsonType": "array",
             "items": {
               "bsonType": "object",
-              "required": ["team1", "team2", "score1", "score2", "date", "counted"],
+              "required": [
+                "team1",
+                "team2",
+                "score1",
+                "score2",
+                "extra_time",
+                "penalties",
+                "date",
+                "counted"
+              ],
               "properties": {
                 "team1": {
                   "bsonType": "string"
@@ -65,6 +73,12 @@
                 },
                 "score2": {
                   "bsonType": "int"
+                },
+                "extra_time": {
+                  "bsonType": "bool"
+                },
+                "penalties": {
+                  "bsonType": "bool"
                 },
                 "date": {
                   "bsonType": "date"
@@ -124,11 +138,11 @@
           "is_active": {
             "bsonType": "bool"
           },
-          "created_at": {
-            "bsonType": "date"
-          },
           "setup_completed": {
             "bsonType": "bool"
+          },
+          "created_at": {
+            "bsonType": "date"
           },
           "playoff": {
             "bsonType": "object",

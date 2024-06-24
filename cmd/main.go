@@ -57,22 +57,15 @@ func main() {
 
 	// Установка меню команд
 	commands := []tgbotapi.BotCommand{
-		{Command: "start", Description: "Start the bot"},
-		{Command: "create_tournament", Description: "Create a new tournament (admin only)"},
-		{Command: "delete_tournament", Description: "Delete an active tournament (admin only)"},
-		{Command: "join", Description: "Join the current tournament"},
-		{Command: "leave", Description: "Leave the current tournament"},
-		{Command: "teams", Description: "Select teams for the tournament"},
-		{Command: "draw", Description: "Perform team draw for the tournament"},
-		{Command: "start_tournament", Description: "Start the tournament"},
-		{Command: "help", Description: "Show available commands"},
-		{Command: "addadmin", Description: "Add a new admin (admin only)"},
-		{Command: "removeadmin", Description: "Remove an admin (admin only)"},
-		{Command: "addteamcategory", Description: "Add a new team category (admin only)"},
-		{Command: "removeteamcategory", Description: "Remove a team category (admin only)"},
-		{Command: "tournament_info", Description: "Show tournament standings and matches"},
-		{Command: "cancel", Description: "Прервать добавление матча"},
-		{Command: "start_playoff", Description: "Start the playoff stage of the tournament"},
+		{Command: "start", Description: "🚀 Запустить бота"},
+		{Command: "create_tournament", Description: "🏆 Создать новый турнир (только для админов)"},
+		{Command: "delete_tournament", Description: "🗑️ Удалить активный турнир (только для админов)"},
+		{Command: "addadmin", Description: "👤 Добавить нового администратора (только для админов)"},
+		{Command: "tournament_info", Description: "ℹ️ Показать турнирную таблицу и матчи"},
+		{Command: "cancel", Description: "❌ Отменить добавление матча"},
+		{Command: "start_playoff", Description: "🔥 Начать этап плей-офф турнира"},
+		{Command: "deletelastmatch", Description: "🗑️ Удалить последний добавленный матч (только для админов)"},
+		{Command: "add_match", Description: "➕ Добавить результат матча (только для админов)"},
 	}
 
 	_, err = botAPI.Request(tgbotapi.NewSetMyCommands(commands...))

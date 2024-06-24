@@ -475,8 +475,37 @@ func callbackHandler(callback *tgbotapi.CallbackQuery) {
 			return
 		}
 
+		// Определяем последний добавленный матч
+		var lastMatch *db.Match
+		var stageType string
+
+		if tournament.Playoff != nil {
+			// Турнир находится в стадии плей-офф
+			if tournament.Playoff.Final != nil {
+				lastMatch = tournament.Playoff.Final
+				stageType = "финал"
+			} else if len(tournament.Playoff.SemiFinals) > 0 {
+				lastMatch = &tournament.Playoff.SemiFinals[len(tournament.Playoff.SemiFinals)-1]
+				stageType = "полуфинал"
+			} else if len(tournament.Playoff.QuarterFinals) > 0 {
+				lastMatch = &tournament.Playoff.QuarterFinals[len(tournament.Playoff.QuarterFinals)-1]
+				stageType = "четвертьфинал"
+			}
+		} else {
+			// Турнир находится в групповом этапе
+			if len(tournament.Matches) > 0 {
+				lastMatch = &tournament.Matches[len(tournament.Matches)-1]
+				stageType = "групповой этап"
+			}
+		}
+
+		if lastMatch == nil {
+			bot.Request(tgbotapi.NewCallback(callback.ID, "В турнире еще нет добавленных матчей."))
+			return
+		}
+
 		// Удаление последнего добавленного матча
-		err = services.DeleteLastMatch(tournament.ID)
+		err = services.DeleteLastMatch(tournament.ID, stageType)
 		if err != nil {
 			log.Printf("Error deleting last match: %v", err)
 			bot.Request(tgbotapi.NewCallback(callback.ID, "Произошла ошибка при удалении последнего матча."))
@@ -1163,44 +1192,6 @@ func getMatchResult(tournamentID int, team1, team2 string) (*db.Match, error) {
 	return nil, errors.New("match not found")
 }
 
-func deleteLastMatchHandler(message *tgbotapi.Message) {
-	// Получение идентификатора текущего активного турнира
-	tournament, err := services.GetActiveTournament()
-	if err != nil {
-		log.Printf("Error getting active tournament: %v", err)
-		bot.Send(tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при получении активного турнира."))
-		return
-	}
-	if tournament == nil {
-		bot.Send(tgbotapi.NewMessage(message.Chat.ID, "В данный момент нет активного турнира."))
-		return
-	}
-
-	// Получение списка матчей для турнира
-	matches := services.GetTournamentMatches(tournament.ID)
-
-	if len(matches) == 0 {
-		bot.Send(tgbotapi.NewMessage(message.Chat.ID, "В турнире еще нет добавленных матчей."))
-		return
-	}
-
-	// Получение последнего добавленного матча
-	lastMatch := matches[len(matches)-1]
-
-	// Отправка предупреждения перед удалением
-	warningMessage := fmt.Sprintf("Вы уверены, что хотите удалить последний добавленный матч?\n\nМатч: %s vs %s\nСчет: %d - %d",
-		lastMatch.Team1, lastMatch.Team2, lastMatch.Score1, lastMatch.Score2)
-	confirmKeyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Да", "confirm_delete_last_match"),
-			tgbotapi.NewInlineKeyboardButtonData("Нет", "cancel_delete_last_match"),
-		),
-	)
-	msg := tgbotapi.NewMessage(message.Chat.ID, warningMessage)
-	msg.ReplyMarkup = confirmKeyboard
-	bot.Send(msg)
-}
-
 func tournamentInfoHandler(message *tgbotapi.Message) {
 	// Получение идентификатора текущего активного турнира
 	tournament, err := services.GetActiveTournament()
@@ -1410,4 +1401,59 @@ func getHeadToHeadResult(team1, team2 string, matches []db.Match) int {
 	} else {
 		return 0
 	}
+}
+
+func deleteLastMatchHandler(message *tgbotapi.Message) {
+	// Получение идентификатора текущего активного турнира
+	tournament, err := services.GetActiveTournament()
+	if err != nil {
+		log.Printf("Error getting active tournament: %v", err)
+		bot.Send(tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при получении активного турнира."))
+		return
+	}
+	if tournament == nil {
+		bot.Send(tgbotapi.NewMessage(message.Chat.ID, "В данный момент нет активного турнира."))
+		return
+	}
+
+	var lastMatch *db.Match
+	var stageType string
+
+	if tournament.Playoff != nil {
+		// Турнир находится в стадии плей-офф
+		if tournament.Playoff.Final != nil {
+			lastMatch = tournament.Playoff.Final
+			stageType = "финал"
+		} else if len(tournament.Playoff.SemiFinals) > 0 {
+			lastMatch = &tournament.Playoff.SemiFinals[len(tournament.Playoff.SemiFinals)-1]
+			stageType = "полуфинал"
+		} else if len(tournament.Playoff.QuarterFinals) > 0 {
+			lastMatch = &tournament.Playoff.QuarterFinals[len(tournament.Playoff.QuarterFinals)-1]
+			stageType = "четвертьфинал"
+		}
+	} else {
+		// Турнир находится в групповом этапе
+		if len(tournament.Matches) > 0 {
+			lastMatch = &tournament.Matches[len(tournament.Matches)-1]
+			stageType = "групповой этап"
+		}
+	}
+
+	if lastMatch == nil {
+		bot.Send(tgbotapi.NewMessage(message.Chat.ID, "В турнире еще нет добавленных матчей."))
+		return
+	}
+
+	// Отправка предупреждения перед удалением
+	warningMessage := fmt.Sprintf("Вы уверены, что хотите удалить последний добавленный матч?\n\nСтадия: %s\nМатч: %s vs %s\nСчет: %d - %d",
+		stageType, lastMatch.Team1, lastMatch.Team2, lastMatch.Score1, lastMatch.Score2)
+	confirmKeyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Да", "confirm_delete_last_match"),
+			tgbotapi.NewInlineKeyboardButtonData("Нет", "cancel_delete_last_match"),
+		),
+	)
+	msg := tgbotapi.NewMessage(message.Chat.ID, warningMessage)
+	msg.ReplyMarkup = confirmKeyboard
+	bot.Send(msg)
 }

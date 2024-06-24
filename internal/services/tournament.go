@@ -404,7 +404,7 @@ func updateStandings(tournamentID int) error {
 	return nil
 }
 
-func DeleteLastMatch(tournamentID int) error {
+func DeleteLastMatch(tournamentID int, stageType string) error {
 	// Получение турнира из базы данных
 	var tournament db.Tournament
 	err := db.DB.Collection("tournaments").FindOne(context.TODO(), bson.M{"id": tournamentID}).Decode(&tournament)
@@ -412,16 +412,142 @@ func DeleteLastMatch(tournamentID int) error {
 		return err
 	}
 
-	// Проверка наличия матчей в турнире
-	if len(tournament.Matches) == 0 {
-		return errors.New("no matches found in the tournament")
+	var deletedMatch *db.Match
+
+	switch stageType {
+	case "групповой этап":
+		// Проверка наличия матчей в групповом этапе турнира
+		if len(tournament.Matches) == 0 {
+			return errors.New("no matches found in the group stage of the tournament")
+		}
+
+		// Сохранение удаленного матча
+		deletedMatch = &tournament.Matches[len(tournament.Matches)-1]
+
+		// Удаление последнего матча из слайса matches
+		tournament.Matches = tournament.Matches[:len(tournament.Matches)-1]
+
+		// Обновление турнира в базе данных
+		_, err = db.DB.Collection("tournaments").UpdateOne(context.TODO(), bson.M{"id": tournamentID}, bson.M{"$set": bson.M{"matches": tournament.Matches}})
+		if err != nil {
+			return err
+		}
+
+	case "четвертьфинал":
+		// Проверка наличия матчей в четвертьфинале турнира
+		if len(tournament.Playoff.QuarterFinals) == 0 {
+			return errors.New("no matches found in the quarter-finals of the tournament")
+		}
+
+		// Сохранение удаленного матча
+		deletedMatch = &tournament.Playoff.QuarterFinals[len(tournament.Playoff.QuarterFinals)-1]
+
+		// Удаление последнего матча из слайса quarter_finals
+		tournament.Playoff.QuarterFinals = tournament.Playoff.QuarterFinals[:len(tournament.Playoff.QuarterFinals)-1]
+
+		// Обновление турнира в базе данных
+		_, err = db.DB.Collection("tournaments").UpdateOne(context.TODO(), bson.M{"id": tournamentID}, bson.M{"$set": bson.M{"playoff.quarter_finals": tournament.Playoff.QuarterFinals}})
+		if err != nil {
+			return err
+		}
+
+	case "полуфинал":
+		// Проверка наличия матчей в полуфинале турнира
+		if len(tournament.Playoff.SemiFinals) == 0 {
+			return errors.New("no matches found in the semi-finals of the tournament")
+		}
+
+		// Сохранение удаленного матча
+		deletedMatch = &tournament.Playoff.SemiFinals[len(tournament.Playoff.SemiFinals)-1]
+
+		// Удаление последнего матча из слайса semi_finals
+		tournament.Playoff.SemiFinals = tournament.Playoff.SemiFinals[:len(tournament.Playoff.SemiFinals)-1]
+
+		// Обновление турнира в базе данных
+		_, err = db.DB.Collection("tournaments").UpdateOne(context.TODO(), bson.M{"id": tournamentID}, bson.M{"$set": bson.M{"playoff.semi_finals": tournament.Playoff.SemiFinals}})
+		if err != nil {
+			return err
+		}
+
+	case "финал":
+		// Проверка наличия финального матча в турнире
+		if tournament.Playoff.Final == nil {
+			return errors.New("no final match found in the tournament")
+		}
+
+		// Сохранение удаленного матча
+		deletedMatch = tournament.Playoff.Final
+
+		// Удаление финального матча
+		tournament.Playoff.Final = nil
+
+		// Обновление турнира в базе данных
+		_, err = db.DB.Collection("tournaments").UpdateOne(context.TODO(), bson.M{"id": tournamentID}, bson.M{"$set": bson.M{"playoff.final": nil}})
+		if err != nil {
+			return err
+		}
+
+	default:
+		return fmt.Errorf("invalid stage type: %s", stageType)
 	}
 
-	// Удаление последнего матча из слайса matches
-	tournament.Matches = tournament.Matches[:len(tournament.Matches)-1]
+	// Обновление турнирной таблицы
+	err = recalculateStandingsAfterDeletion(tournamentID, deletedMatch)
+	if err != nil {
+		return err
+	}
 
-	// Обновление турнира в базе данных
-	_, err = db.DB.Collection("tournaments").UpdateOne(context.TODO(), bson.M{"id": tournamentID}, bson.M{"$set": bson.M{"matches": tournament.Matches}})
+	return nil
+}
+
+func recalculateStandingsAfterDeletion(tournamentID int, deletedMatch *db.Match) error {
+	// Получение турнира из базы данных
+	var tournament db.Tournament
+	err := db.DB.Collection("tournaments").FindOne(context.TODO(), bson.M{"id": tournamentID}).Decode(&tournament)
+	if err != nil {
+		return err
+	}
+
+	// Создание карты для быстрого доступа к записям standings по названию команды
+	standingsMap := make(map[string]*db.Standing)
+	for i := range tournament.Standings {
+		standingsMap[tournament.Standings[i].Team] = &tournament.Standings[i]
+	}
+
+	// Обновление статистики для команд удаленного матча
+	standing1 := standingsMap[deletedMatch.Team1]
+	standing2 := standingsMap[deletedMatch.Team2]
+
+	standing1.Played--
+	standing2.Played--
+
+	standing1.GoalsFor -= deletedMatch.Score1
+	standing1.GoalsAgainst -= deletedMatch.Score2
+	standing2.GoalsFor -= deletedMatch.Score2
+	standing2.GoalsAgainst -= deletedMatch.Score1
+
+	standing1.GoalsDifference = standing1.GoalsFor - standing1.GoalsAgainst
+	standing2.GoalsDifference = standing2.GoalsFor - standing2.GoalsAgainst
+
+	if deletedMatch.Score1 > deletedMatch.Score2 {
+		standing1.Won--
+		standing1.Points -= 3
+		standing2.Lost--
+	} else if deletedMatch.Score1 < deletedMatch.Score2 {
+		standing1.Lost--
+		standing2.Won--
+		standing2.Points -= 3
+	} else {
+		standing1.Drawn--
+		standing1.Points--
+		standing2.Drawn--
+		standing2.Points--
+	}
+
+	// Сохранение обновленных standings в базе данных
+	filter := bson.M{"id": tournamentID}
+	update := bson.M{"$set": bson.M{"standings": tournament.Standings}}
+	_, err = db.DB.Collection("tournaments").UpdateOne(context.TODO(), filter, update)
 	if err != nil {
 		return err
 	}
