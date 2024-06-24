@@ -168,6 +168,7 @@ func GetInactiveTournaments() ([]*db.Tournament, error) {
 	filter := bson.M{"$or": []bson.M{
 		{"setup_completed": false},
 		{"is_active": false},
+		{"is_complete": false},
 	}}
 	cursor, err := db.DB.Collection("tournaments").Find(context.TODO(), filter)
 	if err != nil {
@@ -542,6 +543,11 @@ func StartPlayoff(tournamentID int) error {
 		return err
 	}
 
+	err = notifications.SendPlayoffStartMessage(tournament)
+	if err != nil {
+		log.Printf("Error sending playoff start message: %v", err)
+	}
+
 	return nil
 }
 
@@ -574,16 +580,23 @@ func getHeadToHeadResult(team1, team2 string, matches []db.Match) int {
 	}
 }
 
-func AddPlayoffMatch(tournamentID int, team1, team2 string, score1, score2 int) error {
+func AddPlayoffMatch(tournamentID int, team1, team2 string, score1, score2 int, extraTime, penalties bool) (string, error) {
 	// Получаем турнир из базы данных
 	tournament, err := GetTournament(tournamentID)
 	if err != nil {
-		return err
+		return "", err
+	}
+
+	currentStage := tournament.Playoff.CurrentStage
+
+	// Проверяем, что турнир не завершен
+	if tournament.IsCompleted {
+		return "", errors.New("tournament is already completed")
 	}
 
 	// Проверяем, что плей-офф начался
 	if tournament.Playoff == nil {
-		return errors.New("playoff has not started")
+		return "", errors.New("playoff has not started")
 	}
 
 	// Обновляем текущую стадию плей-офф
@@ -593,6 +606,8 @@ func AddPlayoffMatch(tournamentID int, team1, team2 string, score1, score2 int) 
 		if len(tournament.Playoff.QuarterFinals) > 0 {
 			tournament.Playoff.QuarterFinals[0].Score1 = score1
 			tournament.Playoff.QuarterFinals[0].Score2 = score2
+			tournament.Playoff.QuarterFinals[0].ExtraTime = extraTime
+			tournament.Playoff.QuarterFinals[0].Penalties = penalties
 			tournament.Playoff.QuarterFinals[0].Counted = true
 
 			// Переходим к полуфиналам
@@ -612,6 +627,8 @@ func AddPlayoffMatch(tournamentID int, team1, team2 string, score1, score2 int) 
 		if len(tournament.Playoff.SemiFinals) > 0 {
 			tournament.Playoff.SemiFinals[0].Score1 = score1
 			tournament.Playoff.SemiFinals[0].Score2 = score2
+			tournament.Playoff.SemiFinals[0].ExtraTime = extraTime
+			tournament.Playoff.SemiFinals[0].Penalties = penalties
 			tournament.Playoff.SemiFinals[0].Counted = true
 
 			// Переходим к финалу
@@ -630,37 +647,42 @@ func AddPlayoffMatch(tournamentID int, team1, team2 string, score1, score2 int) 
 		// Обновляем счет финального матча
 		tournament.Playoff.Final.Score1 = score1
 		tournament.Playoff.Final.Score2 = score2
+		tournament.Playoff.Final.ExtraTime = extraTime
+		tournament.Playoff.Final.Penalties = penalties
 		tournament.Playoff.Final.Counted = true
 
 		// Определяем победителя турнира
 		if score1 > score2 {
 			tournament.Playoff.Winner = team1
-		} else if score2 > score1 {
+		} else {
 			tournament.Playoff.Winner = team2
 		}
+
+		tournament.IsCompleted = true
+		tournament.IsActive = false
+
+		err = UpdateParticipantStats(tournamentID, tournament)
+		if err != nil {
+			// Откатываем изменения турнира в случае ошибки
+			tournament.IsCompleted = false
+			tournament.IsActive = true
+			tournament.Playoff.Winner = ""
+			updateErr := UpdateTournament(tournament)
+			if updateErr != nil {
+				log.Printf("failed to rollback tournament update: %v", updateErr)
+			}
+			return "", fmt.Errorf("failed to update participant stats: %v", err)
+		}
+		notifications.SendSeasonRatingMessage()
 	}
 
 	// Обновляем турнир в базе данных
 	err = UpdateTournament(tournament)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	// Создаем объект матча на основе переданных данных
-	match := &db.Match{
-		Team1:  team1,
-		Team2:  team2,
-		Score1: score1,
-		Score2: score2,
-	}
-
-	// Отправляем сообщение с результатами матча
-	err = notifications.SendPlayoffMatchResultMessage(tournament, match)
-	if err != nil {
-		log.Printf("Error sending match result message: %v", err)
-	}
-
-	return nil
+	return currentStage, nil
 }
 
 func getNextStagePairs(matches []db.Match) []db.Match {
@@ -748,4 +770,229 @@ func getFinalTeams(tournament *db.Tournament) []string {
 		return []string{tournament.Playoff.Final.Team1, tournament.Playoff.Final.Team2}
 	}
 	return []string{}
+}
+
+func UpdateParticipantStats(tournamentID int, tournament *db.Tournament) error {
+	for _, participant := range tournament.Participants {
+		var place string
+		var points int
+		var goalsScored, goalsConceded, wins, losses, draws, matchesPlayed int
+
+		// Получаем статистику участника в групповом этапе турнира
+		for _, match := range tournament.Matches {
+			if match.Team1 == tournament.ParticipantTeams[participant] || match.Team2 == tournament.ParticipantTeams[participant] {
+				matchesPlayed++
+				if match.Team1 == tournament.ParticipantTeams[participant] {
+					goalsScored += match.Score1
+					goalsConceded += match.Score2
+					if match.Score1 > match.Score2 {
+						wins++
+					} else if match.Score1 < match.Score2 {
+						losses++
+					} else {
+						draws++
+					}
+				} else {
+					goalsScored += match.Score2
+					goalsConceded += match.Score1
+					if match.Score2 > match.Score1 {
+						wins++
+					} else if match.Score2 < match.Score1 {
+						losses++
+					} else {
+						draws++
+					}
+				}
+			}
+		}
+
+		// Получаем статистику участника в матчах плей-офф
+		for _, match := range tournament.Playoff.QuarterFinals {
+			if match.Team1 == tournament.ParticipantTeams[participant] || match.Team2 == tournament.ParticipantTeams[participant] {
+				matchesPlayed++
+				if match.Team1 == tournament.ParticipantTeams[participant] {
+					goalsScored += match.Score1
+					goalsConceded += match.Score2
+					if match.Score1 > match.Score2 {
+						wins++
+					} else {
+						losses++
+					}
+				} else {
+					goalsScored += match.Score2
+					goalsConceded += match.Score1
+					if match.Score2 > match.Score1 {
+						wins++
+					} else {
+						losses++
+					}
+				}
+			}
+		}
+
+		for _, match := range tournament.Playoff.SemiFinals {
+			if match.Team1 == tournament.ParticipantTeams[participant] || match.Team2 == tournament.ParticipantTeams[participant] {
+				matchesPlayed++
+				if match.Team1 == tournament.ParticipantTeams[participant] {
+					goalsScored += match.Score1
+					goalsConceded += match.Score2
+					if match.Score1 > match.Score2 {
+						wins++
+					} else {
+						losses++
+					}
+				} else {
+					goalsScored += match.Score2
+					goalsConceded += match.Score1
+					if match.Score2 > match.Score1 {
+						wins++
+					} else {
+						losses++
+					}
+				}
+			}
+		}
+
+		if tournament.Playoff.Final != nil {
+			match := *tournament.Playoff.Final
+			if match.Team1 == tournament.ParticipantTeams[participant] || match.Team2 == tournament.ParticipantTeams[participant] {
+				matchesPlayed++
+				if match.Team1 == tournament.ParticipantTeams[participant] {
+					goalsScored += match.Score1
+					goalsConceded += match.Score2
+					if match.Score1 > match.Score2 {
+						wins++
+					} else {
+						losses++
+					}
+				} else {
+					goalsScored += match.Score2
+					goalsConceded += match.Score1
+					if match.Score2 > match.Score1 {
+						wins++
+					} else {
+						losses++
+					}
+				}
+			}
+		}
+
+		// Определяем место участника в плей-офф и начисляем очки
+		if tournament.ParticipantTeams[participant] == tournament.Playoff.Winner {
+			place = "first"
+			points = 8
+		} else if participant == getSecondPlace(tournament) {
+			place = "second"
+			points = 4
+		} else if participant == getThirdPlace(tournament) {
+			place = "third"
+			points = 2
+		} else {
+			place = "group"
+		}
+
+		// Начисляем дополнительные очки за место в групповом этапе
+		groupStage := make([]db.Standing, len(tournament.Standings))
+		copy(groupStage, tournament.Standings)
+		sort.Slice(groupStage, func(i, j int) bool {
+			// Сравнение по количеству очков
+			if groupStage[i].Points != groupStage[j].Points {
+				return groupStage[i].Points > groupStage[j].Points
+			}
+			// Сравнение по разнице забитых и пропущенных мячей
+			if groupStage[i].GoalsDifference != groupStage[j].GoalsDifference {
+				return groupStage[i].GoalsDifference > groupStage[j].GoalsDifference
+			}
+			// Сравнение по количеству забитых мячей
+			if groupStage[i].GoalsFor != groupStage[j].GoalsFor {
+				return groupStage[i].GoalsFor > groupStage[j].GoalsFor
+			}
+			// Сравнение по количеству сыгранных матчей
+			if groupStage[i].Played != groupStage[j].Played {
+				return groupStage[i].Played > groupStage[j].Played
+			}
+			// Сравнение по результатам личных встреч
+			headToHeadResult := getHeadToHeadResult(groupStage[i].Team, groupStage[j].Team, tournament.Matches)
+			if headToHeadResult != 0 {
+				return headToHeadResult > 0
+			}
+			// Сравнение по алфавиту
+			return groupStage[i].Team < groupStage[j].Team
+		})
+
+		for i, standing := range groupStage {
+			if standing.Team == tournament.ParticipantTeams[participant] {
+				if i < 3 {
+					points += 2
+				}
+				break
+			}
+		}
+
+		// Обновляем статистику участника в базе данных
+		update := bson.M{
+			"$inc": bson.M{
+				"stats.total_points":       points,
+				"stats.goals_scored":       goalsScored,
+				"stats.goals_conceded":     goalsConceded,
+				"stats.wins":               wins,
+				"stats.losses":             losses,
+				"stats.draws":              draws,
+				"stats.matches_played":     matchesPlayed,
+				"stats.tournaments_played": 1,
+			},
+			"$push": bson.M{
+				"stats.tournament_stats": bson.M{
+					"tournament_id":  tournamentID,
+					"place":          place,
+					"points":         points,
+					"goals_scored":   goalsScored,
+					"goals_conceded": goalsConceded,
+					"wins":           wins,
+					"losses":         losses,
+					"draws":          draws,
+					"matches_played": matchesPlayed,
+				},
+			},
+		}
+
+		_, err := db.DB.Collection("participants").UpdateOne(context.TODO(), bson.M{"name": participant}, update)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func getSecondPlace(tournament *db.Tournament) string {
+	if tournament.Playoff.Final != nil {
+		if tournament.Playoff.Final.Team1 != tournament.Playoff.Winner {
+			return getParticipantByTeam(tournament.ParticipantTeams, tournament.Playoff.Final.Team1)
+		} else {
+			return getParticipantByTeam(tournament.ParticipantTeams, tournament.Playoff.Final.Team2)
+		}
+	}
+	return ""
+}
+
+func getThirdPlace(tournament *db.Tournament) string {
+	if len(tournament.Playoff.SemiFinals) > 0 {
+		semifinal := tournament.Playoff.SemiFinals[0]
+		if semifinal.Team1 != tournament.Playoff.Winner && semifinal.Team1 != getSecondPlace(tournament) {
+			return getParticipantByTeam(tournament.ParticipantTeams, semifinal.Team1)
+		} else if semifinal.Team2 != tournament.Playoff.Winner && semifinal.Team2 != getSecondPlace(tournament) {
+			return getParticipantByTeam(tournament.ParticipantTeams, semifinal.Team2)
+		}
+	}
+	return ""
+}
+
+func getParticipantByTeam(participantTeams map[string]string, teamName string) string {
+	for participant, team := range participantTeams {
+		if team == teamName {
+			return participant
+		}
+	}
+	return ""
 }

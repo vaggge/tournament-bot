@@ -84,7 +84,7 @@ func SendMatchResultMessage(tournament *db.Tournament, match *db.Match) error {
 		return standings[i].GoalsDifference > standings[j].GoalsDifference
 	})
 
-	tableHeader := "<pre>Поз. Команда            И   В   Н   П   ГЗ  ГП  РГ  Очки</pre>"
+	tableHeader := "<pre>Поз. Команда (Участник)     И   В   Н   П   ГЗ  ГП  РГ  Очки</pre>"
 	tableLines := []string{tableHeader}
 
 	for i, standing := range standings {
@@ -98,7 +98,32 @@ func SendMatchResultMessage(tournament *db.Tournament, match *db.Match) error {
 		goalDifference := standing.GoalsDifference
 		points := standing.Points
 
-		line := fmt.Sprintf("<pre>%2d.  %-15s %4d %3d %3d %3d %3d %3d %+3d %4d</pre>", i+1, team, played, won, drawn, lost, goalsFor, goalsAgainst, goalDifference, points)
+		// Получаем имя участника для текущей команды
+		var participant string
+		for p, t := range tournament.ParticipantTeams {
+			if t == team {
+				participant = p
+				break
+			}
+		}
+
+		// Формируем строку с названием команды и именем участника
+		teamLine := fmt.Sprintf("<b>%s</b> (%s)", team, participant)
+
+		// Определяем символ для выделения позиции в таблице
+		var positionSymbol string
+		switch i {
+		case 0:
+			positionSymbol = "🥇"
+		case 1:
+			positionSymbol = "🥈"
+		case 2:
+			positionSymbol = "🥉"
+		default:
+			positionSymbol = " "
+		}
+
+		line := fmt.Sprintf("<pre>%s%2d. %-23s %2d %2d %2d %2d %3d %3d %+3d %4d</pre>", positionSymbol, i+1, teamLine, played, won, drawn, lost, goalsFor, goalsAgainst, goalDifference, points)
 		tableLines = append(tableLines, line)
 	}
 
@@ -128,87 +153,139 @@ func SendMatchResultMessage(tournament *db.Tournament, match *db.Match) error {
 	return nil
 }
 
-func SendPlayoffMatchResultMessage(tournament *db.Tournament, match *db.Match) error {
-	// Формируем текст сообщения с результатами матча плей-офф
-	message := fmt.Sprintf(`
-<b>⚽ Результаты матча плей-офф:</b>
-<b>%s</b> %d - %d <b>%s</b>
-`, match.Team1, match.Score1, match.Score2, match.Team2)
+func SendPlayoffStartMessage(tournament *db.Tournament) error {
+	// Формируем текст сообщения о начале плей-офф
+	message := fmt.Sprintf("<b>🏆 Начинается плей-офф турнира %s!</b>\n\n", tournament.Name)
+	message += "Команды прошли групповой этап и готовы сразиться в захватывающих матчах плей-офф. Кто станет чемпионом? 🤔\n\n"
+	message += fmt.Sprintf("Не пропустите ни одного матча! Смотрите нашу трансляцию на Twitch: <a href=\"%s\">%s</a> 📺\n\n", TwitchLink, TwitchLink)
+	message += "<b>Сетка плей-офф:</b>\n"
 
-	// Проверяем текущую стадию плей-офф
-	switch tournament.Playoff.CurrentStage {
-	case "quarter":
-		// Добавляем уведомление о начале четвертьфинала
-		message += fmt.Sprintf(`
-<b>🏆 Начался четвертьфинал турнира!</b>
-Не пропустите захватывающие матчи плей-офф! 🔥
-Смотрите нашу трансляцию на Twitch: <a href="%s">%s</a> 📺
-`, TwitchLink, TwitchLink)
-	case "semi":
-		// Добавляем уведомление о начале полуфинала
-		message += fmt.Sprintf(`
-<b>🏆 Начался полуфинал турнира!</b>
-Борьба накаляется! Кто же выйдет в финал? 🤔
-Не пропустите решающие матчи на нашей трансляции Twitch: <a href="%s">%s</a> 📺
-`, TwitchLink, TwitchLink)
-	case "final":
-		// Добавляем уведомление о начале финала
-		message += fmt.Sprintf(`
-<b>🏆 Начался финал турнира!</b>
-Кто станет чемпионом? Узнаем совсем скоро! 🥇
-Смотрите финальный матч на нашей трансляции Twitch: <a href="%s">%s</a> 📺
-`, TwitchLink, TwitchLink)
+	// Формируем сетку плей-офф
+	bracket := "<pre>\n"
+	bracket += "Четвертьфинал:\n"
+	for _, match := range tournament.Playoff.QuarterFinals {
+		bracket += fmt.Sprintf("%s - %s\n", match.Team1, match.Team2)
+	}
+	bracket += "\nПолуфинал:\n"
+	if len(tournament.Playoff.SemiFinals) > 0 {
+		bracket += fmt.Sprintf("%s - ?\n", tournament.Playoff.SemiFinals[0].Team1)
+	}
+	bracket += "\nФинал:\n"
+	if tournament.Playoff.Final != nil {
+		bracket += fmt.Sprintf("%s - ?\n", tournament.Playoff.Final.Team1)
+	} else {
+		bracket += "?\n"
+	}
+	bracket += "</pre>"
+
+	message += bracket
+
+	// Создаем MessageConfig для отправки сообщения в канал
+	msg := tgbotapi.NewMessageToChannel(ChannelID, message)
+	msg.ParseMode = "HTML"
+
+	// Создаем новый экземпляр бота с использованием токена
+	bot, err := tgbotapi.NewBotAPI(BotToken)
+	if err != nil {
+		return fmt.Errorf("failed to create bot: %v", err)
+	}
+
+	// Устанавливаем время ожидания для бота
+	bot.Debug = true
+	bot.Client = &http.Client{Timeout: 30 * time.Second}
+
+	// Отправляем сообщение
+	_, err = bot.Send(msg)
+	if err != nil {
+		return fmt.Errorf("failed to send playoff start message: %v", err)
+	}
+
+	return nil
+}
+
+func SendPlayoffMatchResultMessage(tournament *db.Tournament, currentStage string, match *db.Match) error {
+	// Формируем текст сообщения с результатами матча плей-офф
+	message := fmt.Sprintf("<b>⚽ Результаты матча %s:</b>\n", GetCurrentStageName(currentStage))
+
+	// Проверяем, был ли овертайм или серия пенальти
+	if match.Penalties {
+		message += fmt.Sprintf("<b>%s</b> %d - %d <b>%s</b> (по пенальти)\n", match.Team1, match.Score1, match.Score2, match.Team2)
+	} else if match.ExtraTime {
+		message += fmt.Sprintf("<b>%s</b> %d - %d <b>%s</b> (после овертайма)\n", match.Team1, match.Score1, match.Score2, match.Team2)
+	} else {
+		message += fmt.Sprintf("<b>%s</b> %d - %d <b>%s</b>\n", match.Team1, match.Score1, match.Score2, match.Team2)
 	}
 
 	// Формируем сетку плей-офф
 	bracket := "<pre>\n"
 	bracket += "Четвертьфинал:\n"
 	for _, match := range tournament.Playoff.QuarterFinals {
+		team1Participant := getParticipantByTeam(tournament.ParticipantTeams, match.Team1)
+		team2Participant := getParticipantByTeam(tournament.ParticipantTeams, match.Team2)
 		if match.Counted {
-			bracket += fmt.Sprintf("%s %d - %d %s\n", match.Team1, match.Score1, match.Score2, match.Team2)
+			if match.ExtraTime {
+				if match.Penalties {
+					bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s) (по пенальти)\n", match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
+				} else {
+					bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s) (овертайм)\n", match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
+				}
+			} else {
+				bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s)\n", match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
+			}
 		} else {
-			bracket += fmt.Sprintf("%s - %s\n", match.Team1, match.Team2)
+			bracket += fmt.Sprintf("%s (%s) - %s (%s)\n", match.Team1, team1Participant, match.Team2, team2Participant)
 		}
 	}
 	bracket += "\nПолуфинал:\n"
 	for _, match := range tournament.Playoff.SemiFinals {
+		team1Participant := getParticipantByTeam(tournament.ParticipantTeams, match.Team1)
+		team2Participant := getParticipantByTeam(tournament.ParticipantTeams, match.Team2)
 		if match.Counted {
-			bracket += fmt.Sprintf("%s %d - %d %s\n", match.Team1, match.Score1, match.Score2, match.Team2)
+			if match.ExtraTime {
+				if match.Penalties {
+					bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s) (по пенальти)\n", match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
+				} else {
+					bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s) (овертайм)\n", match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
+				}
+			} else {
+				bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s)\n", match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
+			}
 		} else {
-			bracket += fmt.Sprintf("%s - %s\n", match.Team1, match.Team2)
+			bracket += fmt.Sprintf("%s (%s) - %s (%s)\n", match.Team1, team1Participant, match.Team2, team2Participant)
 		}
 	}
 	bracket += "\nФинал:\n"
 	if tournament.Playoff.Final != nil {
+		team1Participant := getParticipantByTeam(tournament.ParticipantTeams, tournament.Playoff.Final.Team1)
+		team2Participant := getParticipantByTeam(tournament.ParticipantTeams, tournament.Playoff.Final.Team2)
 		if tournament.Playoff.Final.Counted {
-			bracket += fmt.Sprintf("%s %d - %d %s\n", tournament.Playoff.Final.Team1, tournament.Playoff.Final.Score1, tournament.Playoff.Final.Score2, tournament.Playoff.Final.Team2)
+			if tournament.Playoff.Final.ExtraTime {
+				if tournament.Playoff.Final.Penalties {
+					bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s) (по пенальти)\n", tournament.Playoff.Final.Team1, team1Participant, tournament.Playoff.Final.Score1, tournament.Playoff.Final.Score2, tournament.Playoff.Final.Team2, team2Participant)
+				} else {
+					bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s) (овертайм)\n", tournament.Playoff.Final.Team1, team1Participant, tournament.Playoff.Final.Score1, tournament.Playoff.Final.Score2, tournament.Playoff.Final.Team2, team2Participant)
+				}
+			} else {
+				bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s)\n", tournament.Playoff.Final.Team1, team1Participant, tournament.Playoff.Final.Score1, tournament.Playoff.Final.Score2, tournament.Playoff.Final.Team2, team2Participant)
+			}
 		} else {
-			bracket += fmt.Sprintf("%s - %s\n", tournament.Playoff.Final.Team1, tournament.Playoff.Final.Team2)
+			bracket += fmt.Sprintf("%s (%s) - %s (%s)\n", tournament.Playoff.Final.Team1, team1Participant, tournament.Playoff.Final.Team2, team2Participant)
 		}
 	}
 	bracket += "</pre>"
 
-	message += fmt.Sprintf(`
-<b>🏆 Сетка плей-офф:</b>
-%s
-`, bracket)
+	message += fmt.Sprintf("<b>🏆 Сетка плей-офф:</b>\n%s\n", bracket)
 
 	// Проверяем, есть ли победитель турнира
 	if tournament.Playoff.Winner != "" {
 		// Получаем имя игрока-победителя
-		winnerName := ""
-		for player, team := range tournament.ParticipantTeams {
-			if team == tournament.Playoff.Winner {
-				winnerName = player
-				break
-			}
-		}
+		winnerName := getParticipantByTeam(tournament.ParticipantTeams, tournament.Playoff.Winner)
 
 		// Добавляем сообщение о победителе турнира
-		message += fmt.Sprintf(`
-<b>🏆 Победитель турнира: %s 🎉</b>
-Поздравляем <b>%s</b> с победой в турнире!
-`, winnerName, winnerName)
+		message += fmt.Sprintf("<b>🏆 Победитель турнира: %s 🎉</b>\nПоздравляем <b>%s</b> с победой в турнире!\n", winnerName, winnerName)
+
+		// Добавляем информацию о завершении турнира
+		message += "\nТурнир завершен. Спасибо всем участникам и зрителям! 👏\n"
 	}
 
 	// Создаем MessageConfig для отправки сообщения в канал
@@ -229,6 +306,81 @@ func SendPlayoffMatchResultMessage(tournament *db.Tournament, match *db.Match) e
 	_, err = bot.Send(msg)
 	if err != nil {
 		return fmt.Errorf("failed to send playoff match result message: %v", err)
+	}
+
+	return nil
+}
+
+func getParticipantByTeam(participantTeams map[string]string, teamName string) string {
+	for participant, team := range participantTeams {
+		if team == teamName {
+			return participant
+		}
+	}
+	return "Unknown"
+}
+
+func GetCurrentStageName(stage string) string {
+	switch stage {
+	case "quarter":
+		return "четвертьфинала"
+	case "semi":
+		return "полуфинала"
+	case "final":
+		return "финала"
+	default:
+		return ""
+	}
+}
+
+func SendSeasonRatingMessage() error {
+	// Получаем всех участников из базы данных
+	participants, err := db.GetAllParticipantsWithStats()
+	if err != nil {
+		return fmt.Errorf("failed to get participants: %v", err)
+	}
+
+	// Сортируем участников по количеству очков и разнице побед и поражений
+	sort.Slice(participants, func(i, j int) bool {
+		if participants[i].Stats.TotalPoints == participants[j].Stats.TotalPoints {
+			return participants[i].Stats.Wins-participants[i].Stats.Losses > participants[j].Stats.Wins-participants[j].Stats.Losses
+		}
+		return participants[i].Stats.TotalPoints > participants[j].Stats.TotalPoints
+	})
+
+	// Формируем текст сообщения с общей таблицей рейтинга сезона
+	message := "<b>🏆 Общая таблица рейтинга сезона:</b>\n\n"
+	message += "<pre>Поз. Участник               Очки  Турниры  Побед  Ничьих  Пораж.  Голы</pre>\n"
+	message += "<pre>------------------------------------------------------------------------------</pre>\n"
+
+	for i, participant := range participants {
+		stats := participant.Stats
+		line := fmt.Sprintf(
+			"<pre>%2d.  %-20s  %4d    %3d     %3d    %3d     %3d    %3d - %3d</pre>\n",
+			i+1, participant.Name, stats.TotalPoints, stats.TournamentsPlayed,
+			stats.Wins, stats.Draws, stats.Losses, stats.GoalsScored, stats.GoalsConceded,
+		)
+		message += line
+	}
+
+	// Создаем MessageConfig для отправки сообщения в канал
+	msg := tgbotapi.NewMessageToChannel(ChannelID, message)
+	msg.ParseMode = "HTML"
+
+	// Создаем новый экземпляр бота с использованием токена
+	bot, err := tgbotapi.NewBotAPI(BotToken)
+	if err != nil {
+		return fmt.Errorf("failed to create bot: %v", err)
+	}
+
+	// Устанавливаем время ожидания для бота
+	bot.Debug = true
+	bot.Client = &http.Client{Timeout: 30 * time.Second}
+
+	// Отправляем сообщение
+	_, err = bot.Send(msg)
+	if err != nil {
+		return fmt.Errorf("failed to send season rating message: %v", err)
 	}
 
 	return nil

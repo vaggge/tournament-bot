@@ -5,8 +5,33 @@ import (
 )
 
 type Participant struct {
-	ID   string `bson:"_id"`
-	Name string `bson:"name"`
+	ID    string           `bson:"_id"`
+	Name  string           `bson:"name"`
+	Stats ParticipantStats `bson:"stats"`
+}
+
+type ParticipantStats struct {
+	TotalPoints       int              `bson:"total_points"`
+	GoalsScored       int              `bson:"goals_scored"`
+	GoalsConceded     int              `bson:"goals_conceded"`
+	Wins              int              `bson:"wins"`
+	Losses            int              `bson:"losses"`
+	Draws             int              `bson:"draws"`
+	MatchesPlayed     int              `bson:"matches_played"`
+	TournamentsPlayed int              `bson:"tournaments_played"`
+	TournamentStats   []TournamentStat `bson:"tournament_stats"`
+}
+
+type TournamentStat struct {
+	TournamentID  int    `bson:"tournament_id"`
+	Place         string `bson:"place"`
+	Points        int    `bson:"points"`
+	GoalsScored   int    `bson:"goals_scored"`
+	GoalsConceded int    `bson:"goals_conceded"`
+	Wins          int    `bson:"wins"`
+	Losses        int    `bson:"losses"`
+	Draws         int    `bson:"draws"`
+	MatchesPlayed int    `bson:"matches_played"`
 }
 
 type Tournament struct {
@@ -23,6 +48,7 @@ type Tournament struct {
 	SetupCompleted   bool              `bson:"setup_completed"`
 	CreatedAt        time.Time         `bson:"created_at"`
 	Playoff          *Playoff          `bson:"playoff,omitempty"`
+	IsCompleted      bool              `bson:"is_complete"`
 }
 
 type Playoff struct {
@@ -39,12 +65,14 @@ type TeamCategory struct {
 }
 
 type Match struct {
-	Team1   string    `bson:"team1"`
-	Team2   string    `bson:"team2"`
-	Score1  int       `bson:"score1"`
-	Score2  int       `bson:"score2"`
-	Date    time.Time `bson:"date"`
-	Counted bool      `bson:"counted"`
+	Team1     string    `bson:"team1"`
+	Team2     string    `bson:"team2"`
+	Score1    int       `bson:"score1"`
+	Score2    int       `bson:"score2"`
+	ExtraTime bool      `bson:"extra_time"`
+	Penalties bool      `bson:"penalties"`
+	Date      time.Time `bson:"date"`
+	Counted   bool      `bson:"counted"`
 }
 
 type Standing struct {

@@ -53,6 +53,25 @@ func GetAllParticipants() ([]string, error) {
 	return participants, nil
 }
 
+func GetAllParticipantsWithStats() ([]*Participant, error) {
+	// Получаем список всех участников из базы данных
+	cursor, err := DB.Collection("participants").Find(context.Background(), bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(context.Background())
+
+	var participants []*Participant
+	for cursor.Next(context.Background()) {
+		var participant Participant
+		if err := cursor.Decode(&participant); err != nil {
+			return nil, err
+		}
+		participants = append(participants, &participant)
+	}
+	return participants, nil
+}
+
 func ParticipantExists(name string) (bool, error) {
 	count, err := DB.Collection("participants").CountDocuments(context.Background(), bson.M{"name": name})
 	if err != nil {

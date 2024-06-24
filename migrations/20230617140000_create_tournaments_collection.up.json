@@ -19,7 +19,9 @@
           "standings",
           "is_active",
           "created_at",
-          "setup_completed"
+          "setup_completed",
+          "playoff",
+          "is_completed"
         ],
         "properties": {
           "id": {
@@ -70,6 +72,7 @@
                 "counted": {
                   "bsonType": "bool"
                 }
+              }
             }
           },
           "standings": {
@@ -125,6 +128,150 @@
             "bsonType": "date"
           },
           "setup_completed": {
+            "bsonType": "bool"
+          },
+          "playoff": {
+            "bsonType": "object",
+            "required": [
+              "current_stage",
+              "quarter_finals",
+              "semi_finals",
+              "final",
+              "winner"
+            ],
+            "properties": {
+              "current_stage": {
+                "bsonType": "string"
+              },
+              "quarter_finals": {
+                "bsonType": "array",
+                "items": {
+                  "bsonType": "object",
+                  "required": [
+                    "team1",
+                    "team2",
+                    "score1",
+                    "score2",
+                    "extra_time",
+                    "penalties",
+                    "date",
+                    "counted"
+                  ],
+                  "properties": {
+                    "team1": {
+                      "bsonType": "string"
+                    },
+                    "team2": {
+                      "bsonType": "string"
+                    },
+                    "score1": {
+                      "bsonType": "int"
+                    },
+                    "score2": {
+                      "bsonType": "int"
+                    },
+                    "extra_time": {
+                      "bsonType": "bool"
+                    },
+                    "penalties": {
+                      "bsonType": "bool"
+                    },
+                    "date": {
+                      "bsonType": "date"
+                    },
+                    "counted": {
+                      "bsonType": "bool"
+                    }
+                  }
+                }
+              },
+              "semi_finals": {
+                "bsonType": "array",
+                "items": {
+                  "bsonType": "object",
+                  "required": [
+                    "team1",
+                    "team2",
+                    "score1",
+                    "score2",
+                    "extra_time",
+                    "penalties",
+                    "date",
+                    "counted"
+                  ],
+                  "properties": {
+                    "team1": {
+                      "bsonType": "string"
+                    },
+                    "team2": {
+                      "bsonType": "string"
+                    },
+                    "score1": {
+                      "bsonType": "int"
+                    },
+                    "score2": {
+                      "bsonType": "int"
+                    },
+                    "extra_time": {
+                      "bsonType": "bool"
+                    },
+                    "penalties": {
+                      "bsonType": "bool"
+                    },
+                    "date": {
+                      "bsonType": "date"
+                    },
+                    "counted": {
+                      "bsonType": "bool"
+                    }
+                  }
+                }
+              },
+              "final": {
+                "bsonType": "object",
+                "required": [
+                  "team1",
+                  "team2",
+                  "score1",
+                  "score2",
+                  "extra_time",
+                  "penalties",
+                  "date",
+                  "counted"
+                ],
+                "properties": {
+                  "team1": {
+                    "bsonType": "string"
+                  },
+                  "team2": {
+                    "bsonType": "string"
+                  },
+                  "score1": {
+                    "bsonType": "int"
+                  },
+                  "score2": {
+                    "bsonType": "int"
+                  },
+                  "extra_time": {
+                    "bsonType": "bool"
+                  },
+                  "penalties": {
+                    "bsonType": "bool"
+                  },
+                  "date": {
+                    "bsonType": "date"
+                  },
+                  "counted": {
+                    "bsonType": "bool"
+                  }
+                }
+              },
+              "winner": {
+                "bsonType": "string"
+              }
+            }
+          },
+          "is_completed": {
             "bsonType": "bool"
           }
         }

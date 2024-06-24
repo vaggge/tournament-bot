@@ -16,13 +16,21 @@ import (
 	"tournament-bot/internal/services"
 )
 
+const (
+	StateAwaitingScore1 = iota
+	StateAwaitingScore2
+	StateAwaitingOvertimeScore
+	StateAwaitingPenaltiesScore
+)
+
 type TeamSelectionState struct {
-	TournamentID  int
-	Team1         string
-	Team2         string
-	Score1        int
-	Score2        int
-	AwaitingScore bool
+	TournamentID      int
+	Team1             string
+	Team2             string
+	Score1            int
+	Score2            int
+	ConversationState int
+	AwaitingScore     bool
 }
 
 var teamSelectionStates = make(map[int64]*TeamSelectionState)
@@ -66,17 +74,30 @@ func handleMessage(message *tgbotapi.Message) {
 				delete(teamSelectionStates, message.From.ID)
 			}
 		}
+
 	} else {
 		// Проверяем, есть ли активное состояние выбора команд для пользователя
 		state, ok := teamSelectionStates[message.From.ID]
-		if ok && state.AwaitingScore {
-			// Проверяем, является ли сообщение числом (счетом)
-			if _, err := strconv.Atoi(message.Text); err == nil {
-				handleScoreInput(message)
-			} else {
-				// Отправляем сообщение о некорректном вводе
-				msg := tgbotapi.NewMessage(message.Chat.ID, "Пожалуйста, введите корректный счет (целое число).")
-				bot.Send(msg)
+		if ok {
+			switch state.ConversationState {
+			case StateAwaitingScore1, StateAwaitingScore2:
+				// Проверяем, является ли сообщение числом (счетом)
+				if _, err := strconv.Atoi(message.Text); err == nil {
+					handleScoreInput(message)
+				} else {
+					// Отправляем сообщение о некорректном вводе
+					msg := tgbotapi.NewMessage(message.Chat.ID, "Пожалуйста, введите корректный счет (целое число).")
+					bot.Send(msg)
+				}
+			case StateAwaitingOvertimeScore, StateAwaitingPenaltiesScore:
+				// Проверяем, является ли сообщение счетом в формате "команда1:команда2"
+				if strings.Contains(message.Text, ":") {
+					handleScoreInput(message)
+				} else {
+					// Отправляем сообщение о некорректном вводе
+					msg := tgbotapi.NewMessage(message.Chat.ID, "Пожалуйста, введите счет в формате 'команда1:команда2'.")
+					bot.Send(msg)
+				}
 			}
 		}
 	}
@@ -783,7 +804,8 @@ func handleScoreInput(message *tgbotapi.Message) {
 		return
 	}
 
-	if state.AwaitingScore {
+	switch state.ConversationState {
+	case StateAwaitingScore1:
 		// Извлечение введенного счета
 		score, err := strconv.Atoi(message.Text)
 		if err != nil || score < 0 {
@@ -792,99 +814,315 @@ func handleScoreInput(message *tgbotapi.Message) {
 			return
 		}
 
-		if state.Score1 == 0 {
-			// Сохранение счета первой команды
-			state.Score1 = score
+		// Сохранение счета первой команды
+		state.Score1 = score
+		state.ConversationState = StateAwaitingScore2
 
-			// Отправка сообщения с запросом счета второй команды
-			msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("Введите счет для команды %s:", state.Team2))
+		// Отправка сообщения с запросом счета второй команды
+		msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("Введите счет для команды %s:", state.Team2))
+		bot.Send(msg)
+
+	case StateAwaitingScore2:
+		// Извлечение введенного счета
+		score, err := strconv.Atoi(message.Text)
+		if err != nil || score < 0 {
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Неверный формат счета. Пожалуйста, введите неотрицательное целое число.")
 			bot.Send(msg)
-		} else if state.Score2 == 0 {
-			// Сохранение счета второй команды
-			state.Score2 = score
+			return
+		}
 
-			// Получение текущего активного турнира
-			tournament, err := services.GetTournament(state.TournamentID)
+		// Сохранение счета второй команды
+		state.Score2 = score
+
+		// Получение текущего активного турнира
+		tournament, err := services.GetTournament(state.TournamentID)
+		if err != nil {
+			log.Printf("Error getting tournament: %v", err)
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при получении турнира.")
+			bot.Send(msg)
+			delete(teamSelectionStates, message.From.ID)
+			return
+		}
+
+		if tournament.Playoff != nil {
+			// Турнир находится в стадии плей-офф
+			// Проверка, закончился ли матч вничью в основное время
+			if state.Score1 == state.Score2 {
+				state.ConversationState = StateAwaitingOvertimeScore
+
+				// Запрос общего счета матча после овертайма
+				msg := tgbotapi.NewMessage(message.Chat.ID, "Введите общий счет матча после овертайма (команда1:команда2):")
+				bot.Send(msg)
+				return
+			}
+
+			// Добавление результата матча плей-офф
+
+			currentStage, err := services.AddPlayoffMatch(state.TournamentID, state.Team1, state.Team2, state.Score1, state.Score2, false, false)
 			if err != nil {
-				log.Printf("Error getting tournament: %v", err)
-				msg := tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при получении турнира.")
+				log.Printf("Error adding playoff match: %v", err)
+				msg := tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при сохранении результата матча плей-офф.")
+				bot.Send(msg)
+			} else {
+				msg := tgbotapi.NewMessage(message.Chat.ID, "Результат матча плей-офф успешно сохранен.")
+				bot.Send(msg)
+
+				// Получаем обновленный турнир из базы данных
+				tournament, err = services.GetTournament(state.TournamentID)
+				if err != nil {
+					log.Printf("Error getting updated tournament: %v", err)
+					msg := tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при получении обновленного турнира.")
+					bot.Send(msg)
+				} else {
+
+					notifications.SendPlayoffMatchResultMessage(tournament, currentStage, &db.Match{
+						Team1:     state.Team1,
+						Team2:     state.Team2,
+						Score1:    state.Score1,
+						Score2:    state.Score2,
+						ExtraTime: false,
+						Penalties: false,
+						Counted:   true,
+					})
+					// Проверяем, завершился ли плей-офф
+					if tournament.Playoff.Winner != "" {
+						// Плей-офф завершился, объявляем победителя
+						msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("Плей-офф завершился! Победитель: %s", tournament.Playoff.Winner))
+						bot.Send(msg)
+					} else {
+						// Плей-офф продолжается, сообщаем о следующем матче
+						var nextMatch string
+						switch tournament.Playoff.CurrentStage {
+						case "semi":
+							nextMatch = "Полуфинал"
+						case "final":
+							nextMatch = "Финал"
+						default:
+							nextMatch = ""
+						}
+						teams := services.GetCurrentStageTeams(tournament)
+						if len(teams) >= 2 {
+							msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("Следующий матч (%s): %s vs %s", nextMatch, teams[0], teams[1]))
+							bot.Send(msg)
+						} else {
+							// Если нет информации о следующем матче, отправляем сообщение о продолжении плей-офф
+							msg := tgbotapi.NewMessage(message.Chat.ID, "Плей-офф продолжается. Ожидайте информацию о следующем матче.")
+							bot.Send(msg)
+						}
+					}
+				}
+			}
+		} else {
+			// Турнир находится в групповом этапе
+			// Проверка наличия уже добавленного результата матча
+			existingMatch, err := getMatchResult(state.TournamentID, state.Team1, state.Team2)
+			if err == nil && existingMatch != nil {
+				msg := tgbotapi.NewMessage(message.Chat.ID, "Результат матча между этими командами уже был добавлен ранее.")
 				bot.Send(msg)
 				delete(teamSelectionStates, message.From.ID)
 				return
 			}
 
-			if tournament.Playoff != nil {
-				// Турнир находится в стадии плей-офф
-				err = services.AddPlayoffMatch(state.TournamentID, state.Team1, state.Team2, state.Score1, state.Score2)
+			// Добавление результата матча в групповой этап
+			err = services.AddMatchResult(state.TournamentID, state.Team1, state.Team2, state.Score1, state.Score2)
+			if err != nil {
+				log.Printf("Error adding match result: %v", err)
+				msg := tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при сохранении результата матча.")
+				bot.Send(msg)
+			} else {
+				msg := tgbotapi.NewMessage(message.Chat.ID, "Результат матча успешно сохранен.")
+				bot.Send(msg)
+			}
+		}
+
+		// Сброс состояния выбора команд
+		delete(teamSelectionStates, message.From.ID)
+
+	case StateAwaitingOvertimeScore:
+		// Обработка общего счета матча после овертайма
+		overtimeScoreParts := strings.Split(message.Text, ":")
+		if len(overtimeScoreParts) != 2 {
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Неверный формат счета овертайма. Введите общий счет матча после овертайма (команда1:команда2).")
+			bot.Send(msg)
+			return
+		}
+		overtimeScore1, err := strconv.Atoi(overtimeScoreParts[0])
+		if err != nil {
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Неверный формат счета первой команды в овертайме. Введите общий счет матча после овертайма (команда1:команда2).")
+			bot.Send(msg)
+			return
+		}
+		overtimeScore2, err := strconv.Atoi(overtimeScoreParts[1])
+		if err != nil {
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Неверный формат счета второй команды в овертайме. Введите общий счет матча после овертайма (команда1:команда2).")
+			bot.Send(msg)
+			return
+		}
+		state.Score1 = overtimeScore1
+		state.Score2 = overtimeScore2
+
+		// Проверка, закончился ли матч вничью после овертайма
+		if state.Score1 == state.Score2 {
+			state.ConversationState = StateAwaitingPenaltiesScore
+
+			// Запрос счета серии пенальти
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Введите счет серии пенальти (команда1:команда2):")
+			bot.Send(msg)
+			return
+		}
+
+		// Добавление результата матча плей-офф с овертаймом
+		currentStage, err := services.AddPlayoffMatch(state.TournamentID, state.Team1, state.Team2, state.Score1, state.Score2, true, false)
+		if err != nil {
+			log.Printf("Error adding playoff match: %v", err)
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при сохранении результата матча плей-офф.")
+			bot.Send(msg)
+		} else {
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Результат матча плей-офф успешно сохранен.")
+			bot.Send(msg)
+
+			// Получаем обновленный турнир из базы данных
+			tournament, err := services.GetTournament(state.TournamentID)
+			if err != nil {
+				log.Printf("Error getting updated tournament: %v", err)
+				msg := tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при получении обновленного турнира.")
+				bot.Send(msg)
+			} else {
+
+				match := &db.Match{
+					Team1:     state.Team1,
+					Team2:     state.Team2,
+					Score1:    state.Score1,
+					Score2:    state.Score2,
+					ExtraTime: true,
+					Penalties: false,
+					Counted:   true,
+				}
+
+				// Отправляем уведомление о результате матча плей-офф с овертаймом
+				err = notifications.SendPlayoffMatchResultMessage(tournament, currentStage, match)
 				if err != nil {
-					log.Printf("Error adding playoff match: %v", err)
-					msg := tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при сохранении результата матча плей-офф.")
+					log.Printf("Error sending playoff match result message: %v", err)
+				}
+				// Проверяем, завершился ли плей-офф
+				if tournament.Playoff.Winner != "" {
+					// Плей-офф завершился, объявляем победителя
+					msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("Плей-офф завершился! Победитель: %s", tournament.Playoff.Winner))
 					bot.Send(msg)
 				} else {
-					msg := tgbotapi.NewMessage(message.Chat.ID, "Результат матча плей-офф успешно сохранен.")
-					bot.Send(msg)
-
-					// Получаем обновленный турнир из базы данных
-					tournament, err = services.GetTournament(state.TournamentID)
-					if err != nil {
-						log.Printf("Error getting updated tournament: %v", err)
-						msg := tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при получении обновленного турнира.")
+					// Плей-офф продолжается, сообщаем о следующем матче
+					var nextMatch string
+					switch tournament.Playoff.CurrentStage {
+					case "semi":
+						nextMatch = "Полуфинал"
+					case "final":
+						nextMatch = "Финал"
+					default:
+						nextMatch = ""
+					}
+					teams := services.GetCurrentStageTeams(tournament)
+					if len(teams) >= 2 {
+						msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("Следующий матч (%s): %s vs %s", nextMatch, teams[0], teams[1]))
 						bot.Send(msg)
 					} else {
-						// Проверяем, завершился ли плей-офф
-						if tournament.Playoff.Winner != "" {
-							// Плей-офф завершился, объявляем победителя
-							msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("Плей-офф завершился! Победитель: %s", tournament.Playoff.Winner))
-							bot.Send(msg)
-						} else {
-							// Плей-офф продолжается, сообщаем о следующем матче
-							var nextMatch string
-							switch tournament.Playoff.CurrentStage {
-							case "semi":
-								nextMatch = "Полуфинал"
-							case "final":
-								nextMatch = "Финал"
-							default:
-								nextMatch = ""
-							}
-							teams := services.GetCurrentStageTeams(tournament)
-							if len(teams) >= 2 {
-								msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("Следующий матч (%s): %s vs %s", nextMatch, teams[0], teams[1]))
-								bot.Send(msg)
-							} else {
-								// Если нет информации о следующем матче, отправляем сообщение о продолжении плей-офф
-								msg := tgbotapi.NewMessage(message.Chat.ID, "Плей-офф продолжается. Ожидайте информацию о следующем матче.")
-								bot.Send(msg)
-							}
-						}
+						// Если нет информации о следующем матче, отправляем сообщение о продолжении плей-офф
+						msg := tgbotapi.NewMessage(message.Chat.ID, "Плей-офф продолжается. Ожидайте информацию о следующем матче.")
+						bot.Send(msg)
 					}
 				}
+			}
+		}
+
+		// Сброс состояния выбора команд
+		delete(teamSelectionStates, message.From.ID)
+
+	case StateAwaitingPenaltiesScore:
+		// Обработка счета серии пенальти
+		penaltiesScoreParts := strings.Split(message.Text, ":")
+		if len(penaltiesScoreParts) != 2 {
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Неверный формат счета серии пенальти. Введите счет серии пенальти (команда1:команда2).")
+			bot.Send(msg)
+			return
+		}
+		penaltiesScore1, err := strconv.Atoi(penaltiesScoreParts[0])
+		if err != nil {
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Неверный формат счета первой команды в серии пенальти. Введите счет серии пенальти (команда1:команда2).")
+			bot.Send(msg)
+			return
+		}
+		penaltiesScore2, err := strconv.Atoi(penaltiesScoreParts[1])
+		if err != nil {
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Неверный формат счета второй команды в серии пенальти. Введите счет серии пенальти (команда1:команда2).")
+			bot.Send(msg)
+			return
+		}
+		state.Score1 = penaltiesScore1
+		state.Score2 = penaltiesScore2
+
+		// Добавление результата матча плей-офф с овертаймом и серией пенальти
+		currentStage, err := services.AddPlayoffMatch(state.TournamentID, state.Team1, state.Team2, state.Score1, state.Score2, true, true)
+		if err != nil {
+			log.Printf("Error adding playoff match: %v", err)
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при сохранении результата матча плей-офф.")
+			bot.Send(msg)
+		} else {
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Результат матча плей-офф успешно сохранен.")
+			bot.Send(msg)
+
+			// Получаем обновленный турнир из базы данных
+			tournament, err := services.GetTournament(state.TournamentID)
+			if err != nil {
+				log.Printf("Error getting updated tournament: %v", err)
+				msg := tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при получении обновленного турнира.")
+				bot.Send(msg)
 			} else {
-				// Турнир находится в групповом этапе
-				// Проверка наличия уже добавленного результата матча
-				existingMatch, err := getMatchResult(state.TournamentID, state.Team1, state.Team2)
-				if err == nil && existingMatch != nil {
-					msg := tgbotapi.NewMessage(message.Chat.ID, "Результат матча между этими командами уже был добавлен ранее.")
-					bot.Send(msg)
-					delete(teamSelectionStates, message.From.ID)
-					return
+
+				match := &db.Match{
+					Team1:     state.Team1,
+					Team2:     state.Team2,
+					Score1:    state.Score1,
+					Score2:    state.Score2,
+					ExtraTime: true,
+					Penalties: true,
+					Counted:   true,
 				}
 
-				// Добавление результата матча в групповой этап
-				err = services.AddMatchResult(state.TournamentID, state.Team1, state.Team2, state.Score1, state.Score2)
+				// Отправляем уведомление о результате матча плей-офф с овертаймом
+				err = notifications.SendPlayoffMatchResultMessage(tournament, currentStage, match)
 				if err != nil {
-					log.Printf("Error adding match result: %v", err)
-					msg := tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при сохранении результата матча.")
+					log.Printf("Error sending playoff match result message: %v", err)
+				}
+				// Проверяем, завершился ли плей-офф
+				if tournament.Playoff.Winner != "" {
+					// Плей-офф завершился, объявляем победителя
+					msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("Плей-офф завершился! Победитель: %s", tournament.Playoff.Winner))
 					bot.Send(msg)
 				} else {
-					msg := tgbotapi.NewMessage(message.Chat.ID, "Результат матча успешно сохранен.")
-					bot.Send(msg)
+					// Плей-офф продолжается, сообщаем о следующем матче
+					var nextMatch string
+					switch tournament.Playoff.CurrentStage {
+					case "semi":
+						nextMatch = "Полуфинал"
+					case "final":
+						nextMatch = "Финал"
+					default:
+						nextMatch = ""
+					}
+					teams := services.GetCurrentStageTeams(tournament)
+					if len(teams) >= 2 {
+						msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("Следующий матч (%s): %s vs %s", nextMatch, teams[0], teams[1]))
+						bot.Send(msg)
+					} else {
+						// Если нет информации о следующем матче
+						msg := tgbotapi.NewMessage(message.Chat.ID, "Плей-офф продолжается. Ожидайте информацию о следующем матче.")
+						bot.Send(msg)
+					}
 				}
 			}
-
-			// Сброс состояния выбора команд
-			delete(teamSelectionStates, message.From.ID)
 		}
+
+		// Сброс состояния выбора команд
+		delete(teamSelectionStates, message.From.ID)
 	}
 }
 
