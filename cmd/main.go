@@ -18,7 +18,7 @@ func main() {
 	// Инициализация базы данных
 	db.InitDB()
 
-	m, err := migrate.New("file://migrations", "mongodb://localhost:27017/tournament")
+	m, err := migrate.New("file://migrations", "mongodb://mongo:27017/tournament")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func main() {
 	go deleteUnfinishedTournaments()
 
 	// Настройка вебхука
-	err = bot.SetWebhook("7012505888:AAEtQoe-AwaoNoC5OPUQaQ6jAqNHKYAKcQk", "https://ca41-46-159-186-86.ngrok-free.app/webhook")
+	err = bot.SetWebhook("7012505888:AAEtQoe-AwaoNoC5OPUQaQ6jAqNHKYAKcQk", "http://89.111.173.51/webhook")
 	if err != nil {
 		log.Fatalf("Error setting webhook: %v", err)
 	}

@@ -1,0 +1,301 @@
+[
+  {
+    "insertMany": "participants",
+    "documents": [
+      {
+        "name": "Егиш Барсамян",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Никита Данилов",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Эдгар Гасанов",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Ваге Лулукян",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Давид Шашикян",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Гаго Мовсесян",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Кимик Барекян",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Кирилл Горбунов",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Вячеслав Прохоренко",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Валерий Кананян",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Георгий Кананян",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Вячеслав Ивченко",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Важик Шашикян",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Андрей Ситниченко",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Александр Сарназиди",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Алексей Крыга",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Ярослав Цымбалий",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Давид Абаджян",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Диего Айрапетян",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Зубайра",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      },
+      {
+        "name": "Юрий Гармашов",
+        "stats": {
+          "total_points": 0,
+          "goals_scored": 0,
+          "goals_conceded": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "matches_played": 0,
+          "tournaments_played": 0,
+          "tournament_stats": []
+        }
+      }
+    ]
+  }
+]
