@@ -11,7 +11,22 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Deploy to VPS
+      - name: Check directory and git status
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "Current directory: $(pwd)"
+            cd ${{ secrets.PROJECT_PATH }}
+            echo "Project directory: $(pwd)"
+            echo "Directory contents:"
+            ls -la
+            echo "Git status:"
+            git status
+
+      - name: Pull latest changes
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST }}
@@ -20,6 +35,30 @@ jobs:
           script: |
             cd ${{ secrets.PROJECT_PATH }}
             git pull origin main
+
+      - name: Check Docker and docker-compose
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ${{ secrets.PROJECT_PATH }}
+            echo "Docker version:"
+            docker --version
+            echo "Docker-compose version:"
+            docker-compose --version
+            echo "Docker-compose file contents:"
+            cat docker-compose.yml
+
+      - name: Deploy with docker-compose
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ${{ secrets.PROJECT_PATH }}
             docker-compose down
             docker-compose build --no-cache
             docker-compose up -d
