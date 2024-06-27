@@ -2,9 +2,6 @@ package main
 
 import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/mongodb"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/robfig/cron/v3"
 	"log"
 	"time"
@@ -21,20 +18,11 @@ func main() {
 	// Инициализация базы данных
 	db.InitDB(cfg.MongoURI)
 
-	m, err := migrate.New("file://migrations", cfg.MongoURI+"/tournament")
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = m.Up()
-	if err != nil && err != migrate.ErrNoChange {
-		log.Fatal(err)
-	}
-
 	// Создаем новый планировщик задач
 	c := cron.New()
 
 	// Добавляем задачу для удаления незавершенных турниров каждый день в 6:00 AM по московскому времени
-	_, err = c.AddFunc("0 6 * * *", deleteUnfinishedTournaments)
+	_, err := c.AddFunc("0 6 * * *", deleteUnfinishedTournaments)
 	if err != nil {
 		log.Fatalf("Error adding deleteUnfinishedTournaments to cron: %v", err)
 	}
