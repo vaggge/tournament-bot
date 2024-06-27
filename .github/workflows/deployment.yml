@@ -19,7 +19,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             echo "Current directory: $(pwd)"
-            cd ${{ secrets.PROJECT_PATH }}
+            cd /root/bot/tournament-bot
             echo "Project directory: $(pwd)"
             echo "Directory contents:"
             ls -la
@@ -43,7 +43,7 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd ${{ secrets.PROJECT_PATH }}
+            cd /root/bot/tournament-bot
             echo "Docker version:"
             docker --version
             echo "Docker-compose version:"
@@ -58,7 +58,7 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd ${{ secrets.PROJECT_PATH }}
+            cd /root/bot/tournament-bot
             docker-compose down
             docker-compose build --no-cache
             docker-compose up -d
