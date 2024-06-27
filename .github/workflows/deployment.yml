@@ -36,6 +36,43 @@ jobs:
             cd /root/bot/tournament-bot
             git pull origin main
 
+      - name: Update dependencies
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/bot/tournament-bot
+            go mod tidy
+            go mod download
+
+      - name: Check environment variables
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/bot/tournament-bot
+            echo "Checking .env file:"
+            if [ -f .env ]; then
+              cat .env | sed 's/=.*/=****/' # Скрываем значения
+            else
+              echo ".env file not found"
+            fi
+
+      - name: Check Dockerfile
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/bot/tournament-bot
+            echo "Dockerfile contents:"
+            cat Dockerfile
+
       - name: Check Docker and docker-compose
         uses: appleboy/ssh-action@master
         with:
@@ -60,5 +97,25 @@ jobs:
           script: |
             cd /root/bot/tournament-bot
             docker-compose down
-            docker-compose build --no-cache
+            docker-compose build --no-cache 2>&1 | tee build.log
+            if [ $? -ne 0 ]; then
+              echo "Build failed. Log:"
+              cat build.log
+              exit 1
+            fi
             docker-compose up -d
+            echo "Deployment completed. Checking logs:"
+            docker-compose logs app
+
+      - name: Check application status
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/bot/tournament-bot
+            echo "Container status:"
+            docker-compose ps
+            echo "Application logs:"
+            docker-compose logs app --tail=50
