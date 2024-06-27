@@ -140,6 +140,7 @@ func IsAdmin(userID int64) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	log.Printf("Admin check result for user %d: %v", userID, count > 0)
 	return count > 0, nil
 }
 

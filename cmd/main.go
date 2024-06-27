@@ -40,12 +40,12 @@ func main() {
 	c.Start()
 
 	// Запуск веб-сервера для обработки вебхуков
-	go web.StartServer(":8080")
+	go web.StartServer(":8081")
 
 	go deleteUnfinishedTournaments()
 
 	// Настройка вебхука
-	err = bot.SetWebhook("7012505888:AAEtQoe-AwaoNoC5OPUQaQ6jAqNHKYAKcQk", "http://89.111.173.51/webhook")
+	err = bot.SetWebhook("7012505888:AAEtQoe-AwaoNoC5OPUQaQ6jAqNHKYAKcQk", "https://tournament-bot.online/webhook")
 	if err != nil {
 		log.Fatalf("Error setting webhook: %v", err)
 	}

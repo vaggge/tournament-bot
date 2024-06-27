@@ -44,6 +44,7 @@ func CreateTournament() (*db.Tournament, error) {
 		IsActive:         false,
 		SetupCompleted:   false,
 		CreatedAt:        time.Now(),
+		IsCompleted:      false,
 	}
 
 	_, err := db.DB.Collection("tournaments").InsertOne(context.TODO(), tournament)

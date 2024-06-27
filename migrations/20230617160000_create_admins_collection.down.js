@@ -1,0 +1,1 @@
+db.getSiblingDB('tournament').admins.drop();

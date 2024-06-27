@@ -48,7 +48,7 @@ type Tournament struct {
 	SetupCompleted   bool              `bson:"setup_completed"`
 	CreatedAt        time.Time         `bson:"created_at"`
 	Playoff          *Playoff          `bson:"playoff,omitempty"`
-	IsCompleted      bool              `bson:"is_complete"`
+	IsCompleted      bool              `bson:"is_completed"`
 }
 
 type Playoff struct {
