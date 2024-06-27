@@ -58,16 +58,3 @@ jobs:
             docker-compose ps
             echo "Application logs:"
             docker-compose logs app
-
-      - name: Check application status
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd /root/bot/tournament-bot
-            echo "Container status:"
-            docker-compose ps
-            echo "Application logs:"
-            docker-compose logs app --tail=50
