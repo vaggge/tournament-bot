@@ -10,8 +10,7 @@ import (
 
 var DB *mongo.Database
 
-func InitDB() {
-	mongoURI := "mongodb://mongo:27017"
+func InitDB(mongoURI string) {
 
 	clientOptions := options.Client().ApplyURI(mongoURI)
 	client, err := mongo.Connect(context.TODO(), clientOptions)

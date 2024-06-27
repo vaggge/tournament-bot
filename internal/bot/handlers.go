@@ -35,7 +35,7 @@ type TeamSelectionState struct {
 
 var teamSelectionStates = make(map[int64]*TeamSelectionState)
 
-func handleMessage(message *tgbotapi.Message) {
+func HandleMessage(message *tgbotapi.Message) {
 	if message.IsCommand() {
 		switch message.Command() {
 		case "add_participant":
@@ -262,7 +262,7 @@ func endTournament(message *tgbotapi.Message) {
 	bot.Send(tgbotapi.NewMessage(message.Chat.ID, "Tournament ended"))
 }
 
-func callbackHandler(callback *tgbotapi.CallbackQuery) {
+func СallbackHandler(callback *tgbotapi.CallbackQuery) {
 	if strings.HasPrefix(callback.Data, "toggle_participant_") {
 		parts := strings.Split(callback.Data, "_")
 		tournamentID, err := strconv.Atoi(parts[2])

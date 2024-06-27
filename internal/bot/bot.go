@@ -39,9 +39,9 @@ func WebhookHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if update.Message != nil {
-		handleMessage(update.Message)
+		HandleMessage(update.Message)
 	} else if update.CallbackQuery != nil {
-		callbackHandler(update.CallbackQuery)
+		СallbackHandler(update.CallbackQuery)
 	}
 }
 

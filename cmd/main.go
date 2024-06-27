@@ -8,6 +8,7 @@ import (
 	"github.com/robfig/cron/v3"
 	"log"
 	"time"
+	"tournament-bot/config"
 	"tournament-bot/internal/bot"
 	"tournament-bot/internal/db"
 	"tournament-bot/internal/services"
@@ -15,10 +16,12 @@ import (
 )
 
 func main() {
-	// Инициализация базы данных
-	db.InitDB()
+	cfg := config.LoadConfig()
 
-	m, err := migrate.New("file://migrations", "mongodb://mongo:27017/tournament")
+	// Инициализация базы данных
+	db.InitDB(cfg.MongoURI)
+
+	m, err := migrate.New("file://migrations", cfg.MongoURI+"/tournament")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -39,18 +42,9 @@ func main() {
 	// Запускаем планировщик задач
 	c.Start()
 
-	// Запуск веб-сервера для обработки вебхуков
-	go web.StartServer(":8081")
-
 	go deleteUnfinishedTournaments()
 
-	// Настройка вебхука
-	err = bot.SetWebhook("7012505888:AAEtQoe-AwaoNoC5OPUQaQ6jAqNHKYAKcQk", "https://tournament-bot.online/webhook")
-	if err != nil {
-		log.Fatalf("Error setting webhook: %v", err)
-	}
-
-	botAPI, err := tgbotapi.NewBotAPI("7012505888:AAEtQoe-AwaoNoC5OPUQaQ6jAqNHKYAKcQk")
+	botAPI, err := tgbotapi.NewBotAPI(cfg.BotToken)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -72,6 +66,17 @@ func main() {
 	if err != nil {
 		log.Printf("Error setting command menu: %v", err)
 	}
+
+	// Режим webhook для production
+	log.Println("Starting bot in production mode (webhook)")
+	// Настройка вебхука
+	err = bot.SetWebhook(cfg.BotToken, cfg.WebhookURL)
+	if err != nil {
+		log.Fatalf("Error setting webhook: %v", err)
+	}
+
+	// Запуск веб-сервера для обработки вебхуков
+	go web.StartServer(":" + cfg.Port)
 
 	// Ожидание завершения программы
 	select {}
