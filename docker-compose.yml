@@ -16,7 +16,7 @@ services:
       - "81:8081"  # Проброс порта 8081 из контейнера на порт 81 на хосте
 
   mongo:
-    image: mongo
+    image: mongo:6.0.15
     volumes:
       - mongodb_data:/data/db
     ports:
