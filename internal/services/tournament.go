@@ -227,19 +227,19 @@ func PerformTeamDraw(tournamentID int) (string, error) {
 
 	// Назначаем команды участникам турнира
 	var drawResult strings.Builder
+	participantTeams := make(map[string]string)
 	for i, participant := range tournament.Participants {
-		team := teams[i%len(teams)]
-		// Сохраняем назначенную команду для участника в базе данных
-		err := db.SetParticipantTeam(tournament.ID, participant, team)
-		if err != nil {
-			return "", err
+		if i >= len(teams) {
+			return "", fmt.Errorf("not enough teams for all participants")
 		}
+		team := teams[i]
+		participantTeams[participant] = team
 		drawResult.WriteString(fmt.Sprintf("%s - %s\n", participant, team))
 	}
 
-	// Создаем записи статистики для каждой команды с нулевыми показателями
+	// Создаем записи статистики только для команд участников
 	standings := make([]db.Standing, 0)
-	for _, team := range teams {
+	for _, team := range participantTeams {
 		standing := db.Standing{
 			Team:            team,
 			Played:          0,
@@ -254,9 +254,14 @@ func PerformTeamDraw(tournamentID int) (string, error) {
 		standings = append(standings, standing)
 	}
 
-	// Обновляем турнир в базе данных с новыми записями статистики команд
+	// Обновляем турнир в базе данных с новыми записями статистики команд и назначенными командами
 	filter := bson.M{"id": tournamentID}
-	update := bson.M{"$set": bson.M{"standings": standings}}
+	update := bson.M{
+		"$set": bson.M{
+			"standings":         standings,
+			"participant_teams": participantTeams,
+		},
+	}
 	_, err = db.DB.Collection("tournaments").UpdateOne(context.TODO(), filter, update)
 	if err != nil {
 		return "", err
