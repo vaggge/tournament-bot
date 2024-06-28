@@ -1,26 +1,35 @@
+
 version: '3'
 services:
   app:
     build: .
     environment:
-      - MONGO_URI=mongodb://mongo:27017
-      - BOT_TOKEN=7012505888:AAEtQoe-AwaoNoC5OPUQaQ6jAqNHKYAKcQk
-      - WEBHOOK_URL=https://tournament-bot.online/webhook
+      - MONGO_URI=${MONGO_URI}
+      - BOT_TOKEN=${BOT_TOKEN}
+      - WEBHOOK_URL=${WEBHOOK_URL}
       - PORT=8081
       - LOCAL_MODE=false
-
     depends_on:
       - mongo
     ports:
-      # - "40000:40000"  # Закомментируйте эту строку
-      - "81:8081"  # Проброс порта 8081 из контейнера на порт 81 на хосте
+      - "81:8081"
+    networks:
+      - app_network
 
   mongo:
     image: mongo:6.0.15
+    command: mongod --auth
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
     volumes:
       - mongodb_data:/data/db
-    ports:
-      - "27017:27017"
+    networks:
+      - app_network
 
 volumes:
   mongodb_data:
+
+networks:
+  app_network:
+    driver: bridge

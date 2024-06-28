@@ -1,3 +1,4 @@
+
 name: Deploy to VPS
 
 on:
@@ -36,7 +37,21 @@ jobs:
             cd /root/bot/tournament-bot
             git pull origin main
 
-      - name: Check project files and build Docker containers
+      - name: Update Docker Compose file with secrets
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: MONGO_ROOT_USERNAME,MONGO_ROOT_PASSWORD,MONGO_APP_USERNAME,MONGO_APP_PASSWORD
+          script: |
+            cd /root/bot/tournament-bot
+            # Обновляем docker-compose.yml с секретами
+            sed -i 's|MONGO_INITDB_ROOT_USERNAME=.*|MONGO_INITDB_ROOT_USERNAME=${{ secrets.MONGO_ROOT_USERNAME }}|g' docker-compose.yml
+            sed -i 's|MONGO_INITDB_ROOT_PASSWORD=.*|MONGO_INITDB_ROOT_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }}|g' docker-compose.yml
+            sed -i 's|MONGO_URI=.*|MONGO_URI=mongodb://${{ secrets.MONGO_APP_USERNAME }}:${{ secrets.MONGO_APP_PASSWORD }}@mongo:27017/tournament?authSource=tournament|g' docker-compose.yml
+
+      - name: Build and start Docker containers
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST }}
@@ -44,12 +59,6 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /root/bot/tournament-bot
-            echo "Checking project files:"
-            ls -la
-            echo "Dockerfile contents:"
-            cat Dockerfile
-            echo "docker-compose.yml contents:"
-            cat docker-compose.yml
             echo "Building and starting containers:"
             docker-compose down
             docker-compose build --no-cache
