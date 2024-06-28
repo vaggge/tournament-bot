@@ -37,19 +37,22 @@ jobs:
             cd /root/bot/tournament-bot
             git pull origin main
 
-      - name: Update Docker Compose file with secrets
+      - name: Create .env file with secrets
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: MONGO_ROOT_USERNAME,MONGO_ROOT_PASSWORD,MONGO_APP_USERNAME,MONGO_APP_PASSWORD
+          envs: MONGO_ROOT_USERNAME,MONGO_ROOT_PASSWORD,MONGO_APP_USERNAME,MONGO_APP_PASSWORD,BOT_TOKEN,WEBHOOK_URL
           script: |
             cd /root/bot/tournament-bot
-            # Обновляем docker-compose.yml с секретами
-            sed -i 's|MONGO_INITDB_ROOT_USERNAME=.*|MONGO_INITDB_ROOT_USERNAME=${{ secrets.MONGO_ROOT_USERNAME }}|g' docker-compose.yml
-            sed -i 's|MONGO_INITDB_ROOT_PASSWORD=.*|MONGO_INITDB_ROOT_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }}|g' docker-compose.yml
-            sed -i 's|MONGO_URI=.*|MONGO_URI=mongodb://${{ secrets.MONGO_APP_USERNAME }}:${{ secrets.MONGO_APP_PASSWORD }}@mongo:27017/tournament?authSource=tournament|g' docker-compose.yml
+            cat > .env << EOL
+            MONGO_ROOT_USERNAME=${{ secrets.MONGO_ROOT_USERNAME }}
+            MONGO_ROOT_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }}
+            MONGO_URI=mongodb://${{ secrets.MONGO_APP_USERNAME }}:${{ secrets.MONGO_APP_PASSWORD }}@mongo:27017/tournament?authSource=tournament
+            BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+            WEBHOOK_URL=${{ secrets.WEBHOOK_URL }}
+            EOL
 
       - name: Build and start Docker containers
         uses: appleboy/ssh-action@master
