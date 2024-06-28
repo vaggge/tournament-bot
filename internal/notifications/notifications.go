@@ -13,7 +13,7 @@ import (
 const (
 	BotToken   = "7012505888:AAEtQoe-AwaoNoC5OPUQaQ6jAqNHKYAKcQk"
 	ChannelID  = "@test_bot_botsadfasd"
-	TwitchLink = "https://www.twitch.tv/your_channel"
+	TwitchLink = "https://www.twitch.tv/prime_club1"
 )
 
 func SendTournamentStartMessage(tournament *db.Tournament) error {

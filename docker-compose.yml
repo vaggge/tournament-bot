@@ -5,7 +5,7 @@ services:
     environment:
       - MONGO_URI=mongodb://mongo:27017
       - BOT_TOKEN=7012505888:AAEtQoe-AwaoNoC5OPUQaQ6jAqNHKYAKcQk
-      - WEBHOOK_URL=https://tournament-bot.online/
+      - WEBHOOK_URL=https://tournament-bot.online/webhook
       - PORT=8081
       - LOCAL_MODE=false
 
