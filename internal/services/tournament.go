@@ -712,7 +712,7 @@ func getHeadToHeadResult(team1, team2 string, matches []db.Match) int {
 	}
 }
 
-func AddPlayoffMatch(tournamentID int, team1, team2 string, score1, score2 int, extraTime, penalties bool) (string, error) {
+func AddPlayoffMatch(tournamentID int, team1, team2 string, score1, score2, penaltyScore1, penaltyScore2 int, extraTime, penalties bool) (string, error) {
 	// Получаем турнир из базы данных
 	tournament, err := GetTournament(tournamentID)
 	if err != nil {
@@ -731,22 +731,31 @@ func AddPlayoffMatch(tournamentID int, team1, team2 string, score1, score2 int, 
 		return "", errors.New("playoff has not started")
 	}
 
+	match := db.Match{
+		Team1:         team1,
+		Team2:         team2,
+		Score1:        score1,
+		Score2:        score2,
+		ExtraTime:     extraTime,
+		Penalties:     penalties,
+		PenaltyScore1: penaltyScore1,
+		PenaltyScore2: penaltyScore2,
+		Counted:       true,
+		Date:          time.Now(),
+	}
+
 	// Обновляем текущую стадию плей-офф
 	switch tournament.Playoff.CurrentStage {
 	case "quarter":
 		// Обновляем счет матча четвертьфинала
 		if len(tournament.Playoff.QuarterFinals) > 0 {
-			tournament.Playoff.QuarterFinals[0].Score1 = score1
-			tournament.Playoff.QuarterFinals[0].Score2 = score2
-			tournament.Playoff.QuarterFinals[0].ExtraTime = extraTime
-			tournament.Playoff.QuarterFinals[0].Penalties = penalties
-			tournament.Playoff.QuarterFinals[0].Counted = true
+			tournament.Playoff.QuarterFinals[0] = match
 
 			// Переходим к полуфиналам
 			tournament.Playoff.CurrentStage = "semi"
 			// Определяем команду-победителя четвертьфинала
 			var winner string
-			if score1 > score2 {
+			if (score1 > score2) || (score1 == score2 && penaltyScore1 > penaltyScore2) {
 				winner = team1
 			} else {
 				winner = team2
@@ -757,17 +766,13 @@ func AddPlayoffMatch(tournamentID int, team1, team2 string, score1, score2 int, 
 	case "semi":
 		// Обновляем счет матча полуфинала
 		if len(tournament.Playoff.SemiFinals) > 0 {
-			tournament.Playoff.SemiFinals[0].Score1 = score1
-			tournament.Playoff.SemiFinals[0].Score2 = score2
-			tournament.Playoff.SemiFinals[0].ExtraTime = extraTime
-			tournament.Playoff.SemiFinals[0].Penalties = penalties
-			tournament.Playoff.SemiFinals[0].Counted = true
+			tournament.Playoff.SemiFinals[0] = match
 
 			// Переходим к финалу
 			tournament.Playoff.CurrentStage = "final"
 			// Определяем команду-победителя полуфинала
 			var winner string
-			if score1 > score2 {
+			if (score1 > score2) || (score1 == score2 && penaltyScore1 > penaltyScore2) {
 				winner = team1
 			} else {
 				winner = team2
@@ -777,14 +782,10 @@ func AddPlayoffMatch(tournamentID int, team1, team2 string, score1, score2 int, 
 		}
 	case "final":
 		// Обновляем счет финального матча
-		tournament.Playoff.Final.Score1 = score1
-		tournament.Playoff.Final.Score2 = score2
-		tournament.Playoff.Final.ExtraTime = extraTime
-		tournament.Playoff.Final.Penalties = penalties
-		tournament.Playoff.Final.Counted = true
+		*tournament.Playoff.Final = match
 
 		// Определяем победителя турнира
-		if score1 > score2 {
+		if (score1 > score2) || (score1 == score2 && penaltyScore1 > penaltyScore2) {
 			tournament.Playoff.Winner = team1
 		} else {
 			tournament.Playoff.Winner = team2

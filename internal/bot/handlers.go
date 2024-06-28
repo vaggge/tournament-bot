@@ -887,7 +887,7 @@ func handleScoreInput(message *tgbotapi.Message) {
 
 			// Добавление результата матча плей-офф
 
-			currentStage, err := services.AddPlayoffMatch(state.TournamentID, state.Team1, state.Team2, state.Score1, state.Score2, false, false)
+			currentStage, err := services.AddPlayoffMatch(state.TournamentID, state.Team1, state.Team2, state.Score1, state.Score2, 0, 0, false, false)
 			if err != nil {
 				log.Printf("Error adding playoff match: %v", err)
 				msg := tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при сохранении результата матча плей-офф.")
@@ -1001,7 +1001,7 @@ func handleScoreInput(message *tgbotapi.Message) {
 		}
 
 		// Добавление результата матча плей-офф с овертаймом
-		currentStage, err := services.AddPlayoffMatch(state.TournamentID, state.Team1, state.Team2, state.Score1, state.Score2, true, false)
+		currentStage, err := services.AddPlayoffMatch(state.TournamentID, state.Team1, state.Team2, state.Score1, state.Score2, 0, 0, true, false)
 		if err != nil {
 			log.Printf("Error adding playoff match: %v", err)
 			msg := tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при сохранении результата матча плей-офф.")
@@ -1066,7 +1066,6 @@ func handleScoreInput(message *tgbotapi.Message) {
 		delete(teamSelectionStates, message.From.ID)
 
 	case StateAwaitingPenaltiesScore:
-		// Обработка счета серии пенальти
 		penaltiesScoreParts := strings.Split(message.Text, ":")
 		if len(penaltiesScoreParts) != 2 {
 			msg := tgbotapi.NewMessage(message.Chat.ID, "Неверный формат счета серии пенальти. Введите счет серии пенальти (команда1:команда2).")
@@ -1085,11 +1084,9 @@ func handleScoreInput(message *tgbotapi.Message) {
 			bot.Send(msg)
 			return
 		}
-		state.Score1 = penaltiesScore1
-		state.Score2 = penaltiesScore2
 
 		// Добавление результата матча плей-офф с овертаймом и серией пенальти
-		currentStage, err := services.AddPlayoffMatch(state.TournamentID, state.Team1, state.Team2, state.Score1, state.Score2, true, true)
+		currentStage, err := services.AddPlayoffMatch(state.TournamentID, state.Team1, state.Team2, state.Score1, state.Score2, penaltiesScore1, penaltiesScore2, true, true)
 		if err != nil {
 			log.Printf("Error adding playoff match: %v", err)
 			msg := tgbotapi.NewMessage(message.Chat.ID, "Произошла ошибка при сохранении результата матча плей-офф.")

@@ -207,30 +207,39 @@ func SendPlayoffMatchResultMessage(tournament *db.Tournament, currentStage strin
 	// Формируем текст сообщения с результатами матча плей-офф
 	message := fmt.Sprintf("<b>⚽ Результаты матча %s:</b>\n", GetCurrentStageName(currentStage))
 
-	// Проверяем, был ли овертайм или серия пенальти
+	var resultString string
 	if match.Penalties {
-		message += fmt.Sprintf("<b>%s</b> %d - %d <b>%s</b> (по пенальти)\n", match.Team1, match.Score1, match.Score2, match.Team2)
+		resultString = fmt.Sprintf("<b>%s</b> %d:%d (%d:%d) <b>%s</b> (по пенальти)",
+			match.Team1, match.Score1, match.Score2,
+			match.PenaltyScore1, match.PenaltyScore2, match.Team2)
 	} else if match.ExtraTime {
-		message += fmt.Sprintf("<b>%s</b> %d - %d <b>%s</b> (после овертайма)\n", match.Team1, match.Score1, match.Score2, match.Team2)
+		resultString = fmt.Sprintf("<b>%s</b> %d:%d <b>%s</b> (после овертайма)",
+			match.Team1, match.Score1, match.Score2, match.Team2)
 	} else {
-		message += fmt.Sprintf("<b>%s</b> %d - %d <b>%s</b>\n", match.Team1, match.Score1, match.Score2, match.Team2)
+		resultString = fmt.Sprintf("<b>%s</b> %d:%d <b>%s</b>",
+			match.Team1, match.Score1, match.Score2, match.Team2)
 	}
 
+	message += resultString + "\n\n"
+
 	// Формируем сетку плей-офф
+	message += "<b>🏆 Сетка плей-офф:</b>\n"
 	bracket := "<pre>\n"
 	bracket += "Четвертьфинал:\n"
 	for _, match := range tournament.Playoff.QuarterFinals {
 		team1Participant := getParticipantByTeam(tournament.ParticipantTeams, match.Team1)
 		team2Participant := getParticipantByTeam(tournament.ParticipantTeams, match.Team2)
 		if match.Counted {
-			if match.ExtraTime {
-				if match.Penalties {
-					bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s) (по пенальти)\n", match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
-				} else {
-					bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s) (овертайм)\n", match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
-				}
+			if match.Penalties {
+				bracket += fmt.Sprintf("%s (%s) %d:%d (%d:%d) %s (%s) (пен.)\n",
+					match.Team1, team1Participant, match.Score1, match.Score2,
+					match.PenaltyScore1, match.PenaltyScore2, match.Team2, team2Participant)
+			} else if match.ExtraTime {
+				bracket += fmt.Sprintf("%s (%s) %d:%d %s (%s) (овертайм)\n",
+					match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
 			} else {
-				bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s)\n", match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
+				bracket += fmt.Sprintf("%s (%s) %d:%d %s (%s)\n",
+					match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
 			}
 		} else {
 			bracket += fmt.Sprintf("%s (%s) - %s (%s)\n", match.Team1, team1Participant, match.Team2, team2Participant)
@@ -241,14 +250,16 @@ func SendPlayoffMatchResultMessage(tournament *db.Tournament, currentStage strin
 		team1Participant := getParticipantByTeam(tournament.ParticipantTeams, match.Team1)
 		team2Participant := getParticipantByTeam(tournament.ParticipantTeams, match.Team2)
 		if match.Counted {
-			if match.ExtraTime {
-				if match.Penalties {
-					bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s) (по пенальти)\n", match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
-				} else {
-					bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s) (овертайм)\n", match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
-				}
+			if match.Penalties {
+				bracket += fmt.Sprintf("%s (%s) %d:%d (%d:%d) %s (%s) (пен.)\n",
+					match.Team1, team1Participant, match.Score1, match.Score2,
+					match.PenaltyScore1, match.PenaltyScore2, match.Team2, team2Participant)
+			} else if match.ExtraTime {
+				bracket += fmt.Sprintf("%s (%s) %d:%d %s (%s) (овертайм)\n",
+					match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
 			} else {
-				bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s)\n", match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
+				bracket += fmt.Sprintf("%s (%s) %d:%d %s (%s)\n",
+					match.Team1, team1Participant, match.Score1, match.Score2, match.Team2, team2Participant)
 			}
 		} else {
 			bracket += fmt.Sprintf("%s (%s) - %s (%s)\n", match.Team1, team1Participant, match.Team2, team2Participant)
@@ -259,22 +270,32 @@ func SendPlayoffMatchResultMessage(tournament *db.Tournament, currentStage strin
 		team1Participant := getParticipantByTeam(tournament.ParticipantTeams, tournament.Playoff.Final.Team1)
 		team2Participant := getParticipantByTeam(tournament.ParticipantTeams, tournament.Playoff.Final.Team2)
 		if tournament.Playoff.Final.Counted {
-			if tournament.Playoff.Final.ExtraTime {
-				if tournament.Playoff.Final.Penalties {
-					bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s) (по пенальти)\n", tournament.Playoff.Final.Team1, team1Participant, tournament.Playoff.Final.Score1, tournament.Playoff.Final.Score2, tournament.Playoff.Final.Team2, team2Participant)
-				} else {
-					bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s) (овертайм)\n", tournament.Playoff.Final.Team1, team1Participant, tournament.Playoff.Final.Score1, tournament.Playoff.Final.Score2, tournament.Playoff.Final.Team2, team2Participant)
-				}
+			if tournament.Playoff.Final.Penalties {
+				bracket += fmt.Sprintf("%s (%s) %d:%d (%d:%d) %s (%s) (пен.)\n",
+					tournament.Playoff.Final.Team1, team1Participant,
+					tournament.Playoff.Final.Score1, tournament.Playoff.Final.Score2,
+					tournament.Playoff.Final.PenaltyScore1, tournament.Playoff.Final.PenaltyScore2,
+					tournament.Playoff.Final.Team2, team2Participant)
+			} else if tournament.Playoff.Final.ExtraTime {
+				bracket += fmt.Sprintf("%s (%s) %d:%d %s (%s) (овертайм)\n",
+					tournament.Playoff.Final.Team1, team1Participant,
+					tournament.Playoff.Final.Score1, tournament.Playoff.Final.Score2,
+					tournament.Playoff.Final.Team2, team2Participant)
 			} else {
-				bracket += fmt.Sprintf("%s (%s) %d - %d %s (%s)\n", tournament.Playoff.Final.Team1, team1Participant, tournament.Playoff.Final.Score1, tournament.Playoff.Final.Score2, tournament.Playoff.Final.Team2, team2Participant)
+				bracket += fmt.Sprintf("%s (%s) %d:%d %s (%s)\n",
+					tournament.Playoff.Final.Team1, team1Participant,
+					tournament.Playoff.Final.Score1, tournament.Playoff.Final.Score2,
+					tournament.Playoff.Final.Team2, team2Participant)
 			}
 		} else {
-			bracket += fmt.Sprintf("%s (%s) - %s (%s)\n", tournament.Playoff.Final.Team1, team1Participant, tournament.Playoff.Final.Team2, team2Participant)
+			bracket += fmt.Sprintf("%s (%s) - %s (%s)\n",
+				tournament.Playoff.Final.Team1, team1Participant,
+				tournament.Playoff.Final.Team2, team2Participant)
 		}
 	}
 	bracket += "</pre>"
 
-	message += fmt.Sprintf("<b>🏆 Сетка плей-офф:</b>\n%s\n", bracket)
+	message += bracket + "\n"
 
 	// Проверяем, есть ли победитель турнира
 	if tournament.Playoff.Winner != "" {

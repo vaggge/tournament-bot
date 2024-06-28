@@ -65,14 +65,18 @@ type TeamCategory struct {
 }
 
 type Match struct {
-	Team1     string    `bson:"team1"`
-	Team2     string    `bson:"team2"`
-	Score1    int       `bson:"score1"`
-	Score2    int       `bson:"score2"`
-	ExtraTime bool      `bson:"extra_time"`
-	Penalties bool      `bson:"penalties"`
-	Date      time.Time `bson:"date"`
-	Counted   bool      `bson:"counted"`
+	Team1         string    `bson:"team1"`
+	Team2         string    `bson:"team2"`
+	Score1        int       `bson:"score1"`
+	Score2        int       `bson:"score2"`
+	ExtraTime     bool      `bson:"extra_time"`
+	ExtraScore1   int       `bson:"extra_score1"`
+	ExtraScore2   int       `bson:"extra_score2"`
+	Penalties     bool      `bson:"penalties"`
+	PenaltyScore1 int       `bson:"penalty_score1"`
+	PenaltyScore2 int       `bson:"penalty_score2"`
+	Date          time.Time `bson:"date"`
+	Counted       bool      `bson:"counted"`
 }
 
 type Standing struct {
